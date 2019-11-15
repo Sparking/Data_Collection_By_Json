@@ -1,0 +1,30 @@
+[
+    {
+        "Code Type" : "QR Code",
+        "Code Info" : {
+            "Position Markings" : [
+                {"Order" : 0, "Center X" : 123, "Center Y" : 83, "Module Size" : 5.23},
+                {"Order" : 1, "Center X" : 324, "Center Y" : 546, "Module Size" : 5.07},
+                {"Order" : 2, "Center X" : 563, "Center Y" : 874, "Module Size" : 5.64}],
+            "Alignment Markings" : [
+                {"Center X" : 70, "Center Y" : 31, "Origin X" : 6, "Origin Y" : 6},
+                {"Center X" : 120, "Center Y" : 45, "Origin X" : 6, "Origin Y" : 18}
+            ],
+            "Data" : "empty"
+        }
+    },
+    {
+        "Code Type" : "QR Code",
+        "Code Info" : {
+            "Position Markings" : [
+                {"Order" : 1, "Center X" : 1123, "Center Y" : 183, "Module Size" : 15.23},
+                {"Order" : 2, "Center X" : 1324, "Center Y" : 1546, "Module Size" : 15.07},
+                {"Order" : 0, "Center X" : 1563, "Center Y" : 1874, "Module Size" : 15.64}],
+            "Alignment Markings" : [
+                {"Center X" : 570, "Center Y" : 317, "Origin X" : 6, "Origin Y" : 6},
+                {"Center X" : 820, "Center Y" : 451, "Origin X" : 6, "Origin Y" : 18}
+            ],
+            "Data" : "Hello World"
+        }
+    }
+]
