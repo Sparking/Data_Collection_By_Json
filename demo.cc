@@ -29,6 +29,16 @@ struct qr_alignment_markings {
 };
 
 struct qr_code_info {
+    // QR码额外信息
+    bool avaiable;                // QR是否可用，即是否能被解码
+    bool inverse;                 // QR码是否反向
+    bool mirror;                  // QR码是否是反相的
+
+    // QR码版本信息和格式信息
+    unsigned char version;        // 版本号 0-40
+    unsigned char ec_level;       // 纠错级别 0:L, 1:M, 2:Q, 3:H
+    unsigned char mask;           // 掩膜版本
+
     // 位置探测图形信息
     int pm_size;                  // 位置探测图形个数
     struct qr_position_markings *ppm;   // 位置探测图形信息
@@ -37,23 +47,13 @@ struct qr_code_info {
     int am_size;                  // 校正图形个数
     struct qr_alignment_markings *pam;  // 校正图形信息
 
-    // 解码信息
-    char *data;                   // 解码后的数据
-    int data_size;                // 解码后的数据长度
+    // 解码结果
+    char *text;                   // 解码后的数据
+    int text_length;              // 解码后的数据长度
     int codewords_num;            // 码字总数
     int error_codewords;          // 错误的码字数
     int correct_codewords;        // 纠正的错误码字数
     int mode;                     // 位流的解码模式
-
-    // QR码版本信息和格式信息
-    unsigned char version;        // 版本号 0-40
-    unsigned char ec_level;       // 纠错级别 0:L, 1:M, 2:Q, 3:H
-    unsigned char mask;           // 掩膜版本
-
-    // QR码额外信息
-    bool avaiable;                // QR是否可用，即是否能被解码
-    bool inverse;                 // QR码是否反向
-    bool mirror;                  // QR码是否是反相的
 };
 
 struct qr_code_info *block_reader(rapidjson::Value &v)
@@ -86,22 +86,129 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
         return nullptr;
     }
 
-    itr1 = itr->value.FindMember("Position Markings");
-    if (itr1 == itr->value.MemberEnd()) {
-        std::cerr << "Code Info Should contain Position Markings info at least" << std::endl;
-        return nullptr;
-    }
-
-    if (itr1->value.GetType() != rapidjson::kArrayType) {
-        std::cerr << "Code Info should be an object" << std::endl;
-        return nullptr;
-    }
-
     info = new qr_code_info;
     if (info == nullptr)
         return nullptr;
-
     std::memset(info, 0, sizeof(*info));
+
+    itr1 = itr->value.FindMember("Avaiable");
+    if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
+            && itr1->value.GetType() != rapidjson::kTrueType)) {
+       // 没有设置, 则默认不可解码
+        info->avaiable = false;
+    } else {
+        info->avaiable = itr1->value.GetBool();
+    }
+
+    itr1 = itr->value.FindMember("Mirror");
+    if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
+            && itr1->value.GetType() != rapidjson::kTrueType)) {
+       // 没有设置, 则默认为非镜像
+        info->mirror = false;
+    } else {
+        info->mirror = itr1->value.GetBool();
+    }
+
+    itr1 = itr->value.FindMember("Inverse");
+    if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
+            && itr1->value.GetType() != rapidjson::kTrueType)) {
+       // 没有设置, 则默认为非反相
+        info->inverse = false;
+    } else {
+        info->inverse = itr1->value.GetBool();
+    }
+
+    itr1 = itr->value.FindMember("Version");
+    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+        info->version = 0; // 0表示QR的版本没有设置, 或设置错误
+    } else {
+        info->version = itr1->value.GetUint();
+        if (info->version > 40)
+            info->version = 0;  // 版本不正常, 认为设置错误
+    }
+
+    itr1 = itr->value.FindMember("Error Correction Level");
+    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+        info->ec_level = 0xFF; // 0xFF表示QR的纠错级别没有设置, 或设置错误
+    } else {
+        if (itr1->value.GetUint() > 3) {
+            info->ec_level = 0xFF;  // 纠错级别不正常, 认为设置错误
+        } else {
+            info->ec_level = itr1->value.GetUint();
+        }
+    }
+
+    itr1 = itr->value.FindMember("Mask");
+    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+        info->mask = 0xFF; // 0xFF表示QR的掩膜版本没有设置, 或设置错误
+    } else {
+        if (itr1->value.GetUint() > 8) {
+            info->mask = 0xFF;  // 掩膜版本不正常, 认为设置错误
+        } else {
+            info->mask = itr1->value.GetUint();
+        }
+    }
+
+    itr1 = itr->value.FindMember("Mode");
+    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+        info->mode = 0xFF; // 0xFF表示QR的掩膜版本没有设置, 或设置错误
+    } else {
+        info->mode = itr1->value.GetUint();
+    }
+
+    itr1 = itr->value.FindMember("Decode Result");
+    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kObjectType) {
+        info->text = nullptr;
+        info->text_length = 0;
+        info->codewords_num = 0;
+        info->error_codewords = 0;
+        info->correct_codewords = 0;
+    } else {
+        itr2 = itr1->value.FindMember("Text");
+        if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kStringType) {
+            info->text = strdup(itr2->value.GetString());
+        } else {
+            info->text = nullptr;
+        }
+
+        itr2 = itr1->value.FindMember("Text Length");
+        if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kNumberType) {
+            info->text_length = itr2->value.GetUint();
+        } else if (info->text != nullptr) {
+            info->text_length = strlen(info->text);
+        } else {
+            info->text_length = 0;
+        }
+
+        itr2 = itr1->value.FindMember("Codewords Total Size");
+        if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kNumberType) {
+            info->codewords_num = itr2->value.GetUint();
+        } else {
+            info->codewords_num = 0;
+        }
+
+        itr2 = itr1->value.FindMember("Error Codewords");
+        if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kNumberType) {
+            info->error_codewords = itr2->value.GetUint();
+        } else {
+            info->error_codewords = 0;
+        }
+
+        itr2 = itr1->value.FindMember("Corrected Codewords");
+        if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kNumberType) {
+            info->correct_codewords = itr2->value.GetUint();
+        } else {
+            info->correct_codewords = info->error_codewords;
+        }
+    }
+
+    itr1 = itr->value.FindMember("Position Markings");
+    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kArrayType) {
+        std::cerr << "Code Info Should contain Position Markings info at least" << std::endl;
+        delete info;
+        return nullptr;
+    }
+
     vqpm.clear();
     for (rapidjson::Document::ConstValueIterator vitr = itr1->value.Begin();
             vitr != itr1->value.End(); ++vitr) {
@@ -278,6 +385,37 @@ int qr_code_info_writer(const char *filename, const std::vector<qr_code_info *> 
         writer.String("QR Code");
         writer.Key("Code Info");
         writer.StartObject();
+        writer.Key("Avaiable");
+        writer.Bool(info[i]->avaiable);
+        writer.Key("Mirror");
+        writer.Bool(info[i]->mirror);
+        writer.Key("Inverse");
+        writer.Bool(info[i]->inverse);
+        writer.Key("Version");
+        writer.Uint(info[i]->version);
+        writer.Key("Error Correction Level");
+        writer.Uint(info[i]->ec_level);
+        writer.Key("Mask");
+        writer.Uint(info[i]->mask);
+        writer.Key("Mode");
+        writer.Uint(info[i]->mode);
+        writer.Key("Decode Result");
+        writer.StartObject();
+        writer.Key("Text");
+        if (info[i]->text == nullptr) {
+            writer.Null();
+        } else {
+            writer.String(info[i]->text);
+        }
+        writer.Key("Text Length");
+        writer.Uint(info[i]->text_length);
+        writer.Key("Codewords Total Size");
+        writer.Uint(info[i]->codewords_num);
+        writer.Key("Error Codewords");
+        writer.Uint(info[i]->error_codewords);
+        writer.Key("Corrected Codewords");
+        writer.Uint(info[i]->correct_codewords);
+        writer.EndObject();
         writer.Key("Position Markings");
         writer.StartArray();
         for (int pn = 0; pn < info[i]->pm_size; ++pn) {
@@ -381,7 +519,7 @@ int main(int argc, char *argv[])
         if (pinfo != nullptr) {
             delete[] pinfo->ppm;
             delete[] pinfo->pam;
-            delete[] pinfo->data;
+            free(pinfo->text);
             delete[] pinfo;
         }
     }

@@ -2,6 +2,20 @@
     {
         "Code Type": "QR Code",
         "Code Info": {
+            "Avaiable": true,
+            "Mirror": false,
+            "Inverse": false,
+            "Version": 21,
+            "Error Correction Level": 1,
+            "Mask": 4,
+            "Mode": 1,
+            "Decode Result": {
+                "Text": "https://www.google.com/",
+                "Text Length": 23,
+                "Codewords Total Size": 1890,
+                "Error Codewords": 123,
+                "Corrected Codewords": 123
+            },
             "Position Markings": [
                 {
                     "Order": 0,
@@ -115,6 +129,20 @@
     {
         "Code Type": "QR Code",
         "Code Info": {
+            "Avaiable": false,
+            "Mirror": false,
+            "Inverse": false,
+            "Version": 0,
+            "Error Correction Level": 255,
+            "Mask": 255,
+            "Mode": 255,
+            "Decode Result": {
+                "Text": null,
+                "Text Length": 0,
+                "Codewords Total Size": 0,
+                "Error Codewords": 0,
+                "Corrected Codewords": 0
+            },
             "Position Markings": [
                 {
                     "Order": 1,
