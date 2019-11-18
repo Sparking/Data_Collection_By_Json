@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -6,6 +6,7 @@ extern "C" {
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 typedef struct  {
     int x;

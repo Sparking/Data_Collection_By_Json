@@ -19,6 +19,127 @@ int (*const json_qr_code_info_writer)(const char *filename,
     = cpp_qr_code_info_writer;
 }
 
+int cpp_qr_code_info_writer(const char *filename, const json_qr_code_info *info, const size_t info_count)
+{
+    size_t i;
+    std::fstream json_file;
+    rapidjson::StringBuffer s;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
+
+    if (filename == nullptr || info == nullptr || info_count == 0)
+        return -1;
+
+    json_file.open(filename, std::fstream::out);
+    if (!json_file.is_open()) {
+        return -1;
+    }
+
+    writer.StartArray();
+    for (i = 0; i < info_count; ++i) {
+        if (info[i].pm_size <= 0)
+            continue;
+
+        writer.StartObject();
+        writer.Key("Code Type");
+        writer.String("QR Code");
+        writer.Key("Code Info");
+        writer.StartObject();
+        writer.Key("Avaiable");
+        writer.Bool(info[i].avaiable);
+        writer.Key("Mirror");
+        writer.Bool(info[i].mirror);
+        writer.Key("Inverse");
+        writer.Bool(info[i].inverse);
+        writer.Key("Version");
+        writer.Uint(info[i].version);
+        writer.Key("Error Correction Level");
+        writer.Uint(info[i].ec_level);
+        writer.Key("Mask");
+        writer.Uint(info[i].mask);
+        writer.Key("Mode");
+        writer.Uint(info[i].mode);
+        writer.Key("Position Markings Ref Gray");
+        writer.Uint(info[i].pm_grayT);
+        writer.Key("Decode Result");
+        writer.StartObject();
+        writer.Key("Text");
+        if (info[i].text == nullptr) {
+            writer.Null();
+        } else {
+            writer.String(info[i].text);
+        }
+        writer.Key("Text Length");
+        writer.Uint(info[i].text_length);
+        writer.Key("Codewords Total Size");
+        writer.Uint(info[i].codewords_num);
+        writer.Key("Error Codewords");
+        writer.Uint(info[i].error_codewords);
+        writer.Key("Corrected Codewords");
+        writer.Uint(info[i].correct_codewords);
+        writer.EndObject();
+        writer.Key("Position Markings");
+        writer.StartArray();
+        for (int pn = 0; pn < info[i].pm_size; ++pn) {
+            const json_qr_position_markings &pm = info[i].ppm[pn];
+
+            writer.StartObject();
+            writer.Key("Order");
+            writer.Uint(pm.order);
+            writer.Key("Center XY");
+            writer.StartArray();
+            writer.Uint(pm.center.x);
+            writer.Uint(pm.center.y);
+            writer.EndArray();
+            writer.Key("Conners");
+            writer.StartArray();
+            for (int cn = 0; cn < 4; ++cn) {
+                writer.StartArray();
+                writer.Uint(pm.corners[cn].x);
+                writer.Uint(pm.corners[cn].y);
+                writer.EndArray();
+            }
+            writer.EndArray();
+            writer.Key("X Width");
+            writer.Uint(pm.x_size);
+            writer.Key("Y Width");
+            writer.Uint(pm.y_size);
+            writer.Key("Module Size");
+            writer.Double(pm.module_size);
+            writer.EndObject();
+        }
+        writer.EndArray();
+        writer.Key("Alignment Markings");
+        writer.StartArray();
+        for (int pn = 0; pn < info[i].am_size; ++pn) {
+            const json_qr_alignment_markings &am = info[i].pam[pn];
+
+            writer.StartObject();
+            writer.Key("Origin XY");
+            writer.StartArray();
+            writer.Uint(am.relpos.x);
+            writer.Uint(am.relpos.y);
+            writer.EndArray();
+            writer.Key("Center XY");
+            writer.StartArray();
+            writer.Uint(am.center.x);
+            writer.Uint(am.center.y);
+            writer.EndArray();
+            writer.EndObject();
+        }
+        writer.EndArray();
+        writer.EndObject();
+        writer.EndObject();
+    }
+    writer.EndArray();
+
+    json_file << s.GetString();
+    json_file.close();
+
+    std::cout << s.GetString() << std::endl;
+
+    return 0;
+}
+
 json_qr_code_info *block_reader(rapidjson::Value &v)
 {
     json_qr_code_info *info;
@@ -129,7 +250,11 @@ json_qr_code_info *block_reader(rapidjson::Value &v)
     } else {
         itr2 = itr1->value.FindMember("Text");
         if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kStringType) {
+#if defined(__GNUC__)
             info->text = strdup(itr2->value.GetString());
+#else
+            info->text = _strdup(itr2->value.GetString());
+#endif
         } else {
             info->text = nullptr;
         }
@@ -325,125 +450,6 @@ json_qr_code_info *block_reader(rapidjson::Value &v)
     } /* End of If */
 
     return info;
-}
-
-int cpp_qr_code_info_writer(const char *filename, const json_qr_code_info *info, const size_t info_count)
-{
-    size_t i;
-    std::fstream json_file;
-    rapidjson::StringBuffer s;
-    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
-
-    if (filename == nullptr || info == nullptr || info_count == 0)
-        return -1;
-
-    json_file.open(filename, std::fstream::out);
-    if (!json_file.is_open()) {
-        return -1;
-    }
-
-    writer.StartArray();
-    for (i = 0; i < info_count; ++i) {
-        if (info[i].pm_size <= 0)
-            continue;
-
-        writer.StartObject();
-        writer.Key("Code Type");
-        writer.String("QR Code");
-        writer.Key("Code Info");
-        writer.StartObject();
-        writer.Key("Avaiable");
-        writer.Bool(info[i].avaiable);
-        writer.Key("Mirror");
-        writer.Bool(info[i].mirror);
-        writer.Key("Inverse");
-        writer.Bool(info[i].inverse);
-        writer.Key("Version");
-        writer.Uint(info[i].version);
-        writer.Key("Error Correction Level");
-        writer.Uint(info[i].ec_level);
-        writer.Key("Mask");
-        writer.Uint(info[i].mask);
-        writer.Key("Mode");
-        writer.Uint(info[i].mode);
-        writer.Key("Decode Result");
-        writer.StartObject();
-        writer.Key("Text");
-        if (info[i].text == nullptr) {
-            writer.Null();
-        } else {
-            writer.String(info[i].text);
-        }
-        writer.Key("Text Length");
-        writer.Uint(info[i].text_length);
-        writer.Key("Codewords Total Size");
-        writer.Uint(info[i].codewords_num);
-        writer.Key("Error Codewords");
-        writer.Uint(info[i].error_codewords);
-        writer.Key("Corrected Codewords");
-        writer.Uint(info[i].correct_codewords);
-        writer.EndObject();
-        writer.Key("Position Markings");
-        writer.StartArray();
-        for (int pn = 0; pn < info[i].pm_size; ++pn) {
-            const json_qr_position_markings &pm = info[i].ppm[pn];
-
-            writer.StartObject();
-            writer.Key("Order");
-            writer.Uint(pm.order);
-            writer.Key("Center XY");
-            writer.StartArray();
-            writer.Uint(pm.center.x);
-            writer.Uint(pm.center.y);
-            writer.EndArray();
-            writer.Key("Conners");
-            writer.StartArray();
-            for (int cn = 0; cn < 4; ++cn) {
-                writer.StartArray();
-                writer.Uint(pm.corners[cn].x);
-                writer.Uint(pm.corners[cn].y);
-                writer.EndArray();
-            }
-            writer.EndArray();
-            writer.Key("X Width");
-            writer.Uint(pm.x_size);
-            writer.Key("Y Width");
-            writer.Uint(pm.y_size);
-            writer.Key("Module Size");
-            writer.Double(pm.module_size);
-            writer.EndObject();
-        }
-        writer.EndArray();
-        writer.Key("Alignment Markings");
-        writer.StartArray();
-        for (int pn = 0; pn < info[i].am_size; ++pn) {
-            const json_qr_alignment_markings &am = info[i].pam[pn];
-
-            writer.StartObject();
-            writer.Key("Origin XY");
-            writer.StartArray();
-            writer.Uint(am.relpos.x);
-            writer.Uint(am.relpos.y);
-            writer.EndArray();
-            writer.Key("Center XY");
-            writer.StartArray();
-            writer.Uint(am.center.x);
-            writer.Uint(am.center.y);
-            writer.EndArray();
-            writer.EndObject();
-        }
-        writer.EndArray();
-        writer.EndObject();
-        writer.EndObject();
-    }
-    writer.EndArray();
-
-    json_file << s.GetString();
-    json_file.close();
-
-    std::cout << s.GetString() << std::endl;
-
-    return 0;
 }
 
 int main(int argc, char *argv[])
