@@ -41,8 +41,8 @@
                             345
                         ]
                     ],
-                    "Max Size": 0,
-                    "Min Size": 0,
+                    "X Width": 14,
+                    "Y Width": 13,
                     "Module Size": 5.230000019073486
                 },
                 {
@@ -69,8 +69,8 @@
                             234
                         ]
                     ],
-                    "Max Size": 0,
-                    "Min Size": 0,
+                    "X Width": 0,
+                    "Y Width": 0,
                     "Module Size": 5.070000171661377
                 },
                 {
@@ -97,8 +97,8 @@
                             834
                         ]
                     ],
-                    "Max Size": 0,
-                    "Min Size": 0,
+                    "X Width": 0,
+                    "Y Width": 0,
                     "Module Size": 5.639999866485596
                 }
             ],
@@ -168,8 +168,8 @@
                             0
                         ]
                     ],
-                    "Max Size": 0,
-                    "Min Size": 0,
+                    "X Width": 0,
+                    "Y Width": 0,
                     "Module Size": 15.229999542236329
                 },
                 {
@@ -196,8 +196,8 @@
                             0
                         ]
                     ],
-                    "Max Size": 0,
-                    "Min Size": 0,
+                    "X Width": 0,
+                    "Y Width": 0,
                     "Module Size": 15.069999694824219
                 },
                 {
@@ -224,8 +224,8 @@
                             0
                         ]
                     ],
-                    "Max Size": 0,
-                    "Min Size": 0,
+                    "X Width": 0,
+                    "Y Width": 0,
                     "Module Size": 15.640000343322754
                 }
             ],

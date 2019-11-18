@@ -6,61 +6,24 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <json_data_logger.h>
 
-struct point {
-    int x;
-    int y;
-};
+extern int cpp_qr_code_info_writer(const char *filename,
+        const json_qr_code_info *info, const size_t count);
 
-struct qr_position_markings {
-    int order;          // 序号
-    struct point center;// 中心点坐标
-    struct point conners[4]; // 4个角点的坐标点, 0是背向码区, 顺时针顺序存放
+extern "C" {
+json_qr_code_info g_json_qr_info[5];
+size_t g_json_qr_info_count;
+int (*const json_qr_code_info_writer)(const char *filename,
+        const json_qr_code_info *info, const size_t count)
+    = cpp_qr_code_info_writer;
+}
 
-    // 其他信息
-    float module_size;  // 模块大小
-    int max_size;       // 最大宽度
-    int min_size;       // 最小宽度
-};
-
-struct qr_alignment_markings {
-    struct point relpos;    // 在QR二维码中相对坐标
-    struct point center;    // 在图中的中心点坐标
-};
-
-struct qr_code_info {
-    // QR码额外信息
-    bool avaiable;                // QR是否可用，即是否能被解码
-    bool inverse;                 // QR码是否反向
-    bool mirror;                  // QR码是否是反相的
-
-    // QR码版本信息和格式信息
-    unsigned char version;        // 版本号 0-40
-    unsigned char ec_level;       // 纠错级别 0:L, 1:M, 2:Q, 3:H
-    unsigned char mask;           // 掩膜版本
-
-    // 位置探测图形信息
-    int pm_size;                  // 位置探测图形个数
-    struct qr_position_markings *ppm;   // 位置探测图形信息
-
-    // 校正图形信息
-    int am_size;                  // 校正图形个数
-    struct qr_alignment_markings *pam;  // 校正图形信息
-
-    // 解码结果
-    char *text;                   // 解码后的数据
-    int text_length;              // 解码后的数据长度
-    int codewords_num;            // 码字总数
-    int error_codewords;          // 错误的码字数
-    int correct_codewords;        // 纠正的错误码字数
-    int mode;                     // 位流的解码模式
-};
-
-struct qr_code_info *block_reader(rapidjson::Value &v)
+json_qr_code_info *block_reader(rapidjson::Value &v)
 {
-    struct qr_code_info *info;
-    std::vector<struct qr_position_markings> vqpm;
-    std::vector<struct qr_alignment_markings> vqam;
+    json_qr_code_info *info;
+    std::vector<json_qr_position_markings> vqpm;
+    std::vector<json_qr_alignment_markings> vqam;
     rapidjson::Document::ConstMemberIterator itr, itr1, itr2;
 
     itr = v.FindMember("Code Type");
@@ -86,7 +49,7 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
         return nullptr;
     }
 
-    info = new qr_code_info;
+    info = new json_qr_code_info;
     if (info == nullptr)
         return nullptr;
     std::memset(info, 0, sizeof(*info));
@@ -213,7 +176,7 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
     for (rapidjson::Document::ConstValueIterator vitr = itr1->value.Begin();
             vitr != itr1->value.End(); ++vitr) {
         int flag = 1;
-        qr_position_markings qpm;
+        json_qr_position_markings qpm;
 
         std::memset(&qpm, 0, sizeof(qpm));
         for (itr2 = vitr->MemberBegin(); itr2 != vitr->MemberEnd(); ++itr2) {
@@ -256,9 +219,9 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
 
                     for (tmp_vitr1 = tmp_vitr->GetArray().Begin(); tmp_vitr1 != tmp_vitr->GetArray().End(); ++tmp_vitr1, ++ec) {
                         if (ec == 0) {
-                            qpm.conners[count].x = tmp_vitr1->GetUint();
+                            qpm.corners[count].x = tmp_vitr1->GetUint();
                         } else if (ec == 1) {
-                            qpm.conners[count].y = tmp_vitr1->GetUint();
+                            qpm.corners[count].y = tmp_vitr1->GetUint();
                         } else {
                             flag = 0;
                             break;
@@ -270,6 +233,10 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
                     flag = 0;
                     break;
                 }
+            } else if (std::strcmp(name, "X Width") == 0 && itr2->value.GetType() == rapidjson::kNumberType) {
+                qpm.x_size = itr2->value.GetUint();
+            } else if (std::strcmp(name, "Y Width") == 0 && itr2->value.GetType() == rapidjson::kNumberType) {
+                qpm.y_size = itr2->value.GetUint();
             } else { // 扩展部分
                 continue;
             }
@@ -286,7 +253,7 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
     }
 
     info->pm_size = vqpm.size();
-    info->ppm = new qr_position_markings[info->pm_size];
+    info->ppm = new json_qr_position_markings[info->pm_size];
     if (info->ppm == nullptr) {
         delete info;
         return nullptr;
@@ -306,13 +273,13 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
         for (rapidjson::Document::ConstValueIterator vitr = itr1->value.Begin();
                 vitr != itr1->value.End(); ++vitr) {
             int flag = 1;
-            qr_alignment_markings qam;
+            json_qr_alignment_markings qam;
 
             std::memset(&qam, 0, sizeof(qam));
             for (itr2 = vitr->MemberBegin(); itr2 != vitr->MemberEnd(); ++itr2) {
                 int count = 0;
                 const char *name = itr2->name.GetString();
-                struct point *p;
+                json_point_t *p;
 
                 if (std::strcmp(name, "Center XY") == 0) {
                     p = &qam.center;
@@ -348,7 +315,7 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
         }
 
         if (vqam.size() != 0) {
-            info->pam = new qr_alignment_markings[vqam.size()];
+            info->pam = new json_qr_alignment_markings[vqam.size()];
             if (info->pam != nullptr) {
                 info->am_size = vqam.size();
                 for (size_t i = 0; i < vqam.size(); ++i)
@@ -360,14 +327,14 @@ struct qr_code_info *block_reader(rapidjson::Value &v)
     return info;
 }
 
-int qr_code_info_writer(const char *filename, const std::vector<qr_code_info *> &info)
+int cpp_qr_code_info_writer(const char *filename, const json_qr_code_info *info, const size_t info_count)
 {
     size_t i;
     std::fstream json_file;
     rapidjson::StringBuffer s;
     rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
 
-    if (filename == nullptr || info.size() == 0)
+    if (filename == nullptr || info == nullptr || info_count == 0)
         return -1;
 
     json_file.open(filename, std::fstream::out);
@@ -376,8 +343,8 @@ int qr_code_info_writer(const char *filename, const std::vector<qr_code_info *> 
     }
 
     writer.StartArray();
-    for (i = 0; i < info.size(); ++i) {
-        if (info[i]->pm_size <= 0)
+    for (i = 0; i < info_count; ++i) {
+        if (info[i].pm_size <= 0)
             continue;
 
         writer.StartObject();
@@ -386,40 +353,40 @@ int qr_code_info_writer(const char *filename, const std::vector<qr_code_info *> 
         writer.Key("Code Info");
         writer.StartObject();
         writer.Key("Avaiable");
-        writer.Bool(info[i]->avaiable);
+        writer.Bool(info[i].avaiable);
         writer.Key("Mirror");
-        writer.Bool(info[i]->mirror);
+        writer.Bool(info[i].mirror);
         writer.Key("Inverse");
-        writer.Bool(info[i]->inverse);
+        writer.Bool(info[i].inverse);
         writer.Key("Version");
-        writer.Uint(info[i]->version);
+        writer.Uint(info[i].version);
         writer.Key("Error Correction Level");
-        writer.Uint(info[i]->ec_level);
+        writer.Uint(info[i].ec_level);
         writer.Key("Mask");
-        writer.Uint(info[i]->mask);
+        writer.Uint(info[i].mask);
         writer.Key("Mode");
-        writer.Uint(info[i]->mode);
+        writer.Uint(info[i].mode);
         writer.Key("Decode Result");
         writer.StartObject();
         writer.Key("Text");
-        if (info[i]->text == nullptr) {
+        if (info[i].text == nullptr) {
             writer.Null();
         } else {
-            writer.String(info[i]->text);
+            writer.String(info[i].text);
         }
         writer.Key("Text Length");
-        writer.Uint(info[i]->text_length);
+        writer.Uint(info[i].text_length);
         writer.Key("Codewords Total Size");
-        writer.Uint(info[i]->codewords_num);
+        writer.Uint(info[i].codewords_num);
         writer.Key("Error Codewords");
-        writer.Uint(info[i]->error_codewords);
+        writer.Uint(info[i].error_codewords);
         writer.Key("Corrected Codewords");
-        writer.Uint(info[i]->correct_codewords);
+        writer.Uint(info[i].correct_codewords);
         writer.EndObject();
         writer.Key("Position Markings");
         writer.StartArray();
-        for (int pn = 0; pn < info[i]->pm_size; ++pn) {
-            const struct qr_position_markings &pm = info[i]->ppm[pn];
+        for (int pn = 0; pn < info[i].pm_size; ++pn) {
+            const json_qr_position_markings &pm = info[i].ppm[pn];
 
             writer.StartObject();
             writer.Key("Order");
@@ -433,15 +400,15 @@ int qr_code_info_writer(const char *filename, const std::vector<qr_code_info *> 
             writer.StartArray();
             for (int cn = 0; cn < 4; ++cn) {
                 writer.StartArray();
-                writer.Uint(pm.conners[cn].x);
-                writer.Uint(pm.conners[cn].y);
+                writer.Uint(pm.corners[cn].x);
+                writer.Uint(pm.corners[cn].y);
                 writer.EndArray();
             }
             writer.EndArray();
-            writer.Key("Max Size");
-            writer.Uint(pm.max_size);
-            writer.Key("Min Size");
-            writer.Uint(pm.min_size);
+            writer.Key("X Width");
+            writer.Uint(pm.x_size);
+            writer.Key("Y Width");
+            writer.Uint(pm.y_size);
             writer.Key("Module Size");
             writer.Double(pm.module_size);
             writer.EndObject();
@@ -449,8 +416,8 @@ int qr_code_info_writer(const char *filename, const std::vector<qr_code_info *> 
         writer.EndArray();
         writer.Key("Alignment Markings");
         writer.StartArray();
-        for (int pn = 0; pn < info[i]->am_size; ++pn) {
-            const struct qr_alignment_markings &am = info[i]->pam[pn];
+        for (int pn = 0; pn < info[i].am_size; ++pn) {
+            const json_qr_alignment_markings &am = info[i].pam[pn];
 
             writer.StartObject();
             writer.Key("Origin XY");
@@ -484,8 +451,8 @@ int main(int argc, char *argv[])
     std::string vstr;
     std::fstream json_file;
     rapidjson::Document doc;
-    std::vector<qr_code_info *> info;
-    qr_code_info *pinfo;
+    std::vector<json_qr_code_info *> info;
+    json_qr_code_info *pinfo;
 
     if (argc < 2)
         return -1;
@@ -501,6 +468,7 @@ int main(int argc, char *argv[])
         {
             rapidjson::Document::Array m = doc.GetArray();
             rapidjson::Document::ValueIterator it = m.Begin();
+
             while (it != m.End()) {
                 pinfo = block_reader(*it);
                 if (pinfo != nullptr)
@@ -513,7 +481,11 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    qr_code_info_writer("test.json", info);
+    json_qr_info_clear();
+    for (g_json_qr_info_count = 0; g_json_qr_info_count < info.size(); ++g_json_qr_info_count) {
+        std::memcpy(g_json_qr_info + g_json_qr_info_count, info[g_json_qr_info_count], sizeof(g_json_qr_info[0]));
+    }
+    json_qr_code_info_writer("test.json", g_json_qr_info, g_json_qr_info_count);
     for (size_t i = 0; i < info.size(); ++i) {
         pinfo = info[i];
         if (pinfo != nullptr) {
