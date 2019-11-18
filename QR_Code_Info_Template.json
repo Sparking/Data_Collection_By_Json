@@ -1,30 +1,228 @@
 [
     {
-        "Code Type" : "QR Code",
-        "Code Info" : {
-            "Position Markings" : [
-                {"Order" : 0, "Center X" : 123, "Center Y" : 83, "Module Size" : 5.23},
-                {"Order" : 1, "Center X" : 324, "Center Y" : 546, "Module Size" : 5.07},
-                {"Order" : 2, "Center X" : 563, "Center Y" : 874, "Module Size" : 5.64}],
-            "Alignment Markings" : [
-                {"Center X" : 70, "Center Y" : 31, "Origin X" : 6, "Origin Y" : 6},
-                {"Center X" : 120, "Center Y" : 45, "Origin X" : 6, "Origin Y" : 18}
+        "Code Type": "QR Code",
+        "Code Info": {
+            "Position Markings": [
+                {
+                    "Order": 0,
+                    "Center XY": [
+                        123,
+                        83
+                    ],
+                    "Conners": [
+                        [
+                            123,
+                            123
+                        ],
+                        [
+                            234,
+                            456
+                        ],
+                        [
+                            424,
+                            234
+                        ],
+                        [
+                            545,
+                            345
+                        ]
+                    ],
+                    "Max Size": 0,
+                    "Min Size": 0,
+                    "Module Size": 5.230000019073486
+                },
+                {
+                    "Order": 1,
+                    "Center XY": [
+                        324,
+                        546
+                    ],
+                    "Conners": [
+                        [
+                            741,
+                            523
+                        ],
+                        [
+                            908,
+                            137
+                        ],
+                        [
+                            416,
+                            734
+                        ],
+                        [
+                            515,
+                            234
+                        ]
+                    ],
+                    "Max Size": 0,
+                    "Min Size": 0,
+                    "Module Size": 5.070000171661377
+                },
+                {
+                    "Order": 2,
+                    "Center XY": [
+                        563,
+                        874
+                    ],
+                    "Conners": [
+                        [
+                            710,
+                            512
+                        ],
+                        [
+                            1008,
+                            597
+                        ],
+                        [
+                            460,
+                            834
+                        ],
+                        [
+                            55,
+                            834
+                        ]
+                    ],
+                    "Max Size": 0,
+                    "Min Size": 0,
+                    "Module Size": 5.639999866485596
+                }
             ],
-            "Data" : "empty"
+            "Alignment Markings": [
+                {
+                    "Origin XY": [
+                        6,
+                        18
+                    ],
+                    "Center XY": [
+                        70,
+                        31
+                    ]
+                },
+                {
+                    "Origin XY": [
+                        6,
+                        8
+                    ],
+                    "Center XY": [
+                        120,
+                        45
+                    ]
+                }
+            ]
         }
     },
     {
-        "Code Type" : "QR Code",
-        "Code Info" : {
-            "Position Markings" : [
-                {"Order" : 1, "Center X" : 1123, "Center Y" : 183, "Module Size" : 15.23},
-                {"Order" : 2, "Center X" : 1324, "Center Y" : 1546, "Module Size" : 15.07},
-                {"Order" : 0, "Center X" : 1563, "Center Y" : 1874, "Module Size" : 15.64}],
-            "Alignment Markings" : [
-                {"Center X" : 570, "Center Y" : 317, "Origin X" : 6, "Origin Y" : 6},
-                {"Center X" : 820, "Center Y" : 451, "Origin X" : 6, "Origin Y" : 18}
+        "Code Type": "QR Code",
+        "Code Info": {
+            "Position Markings": [
+                {
+                    "Order": 1,
+                    "Center XY": [
+                        1123,
+                        183
+                    ],
+                    "Conners": [
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ]
+                    ],
+                    "Max Size": 0,
+                    "Min Size": 0,
+                    "Module Size": 15.229999542236329
+                },
+                {
+                    "Order": 2,
+                    "Center XY": [
+                        1324,
+                        1546
+                    ],
+                    "Conners": [
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ]
+                    ],
+                    "Max Size": 0,
+                    "Min Size": 0,
+                    "Module Size": 15.069999694824219
+                },
+                {
+                    "Order": 0,
+                    "Center XY": [
+                        1563,
+                        1874
+                    ],
+                    "Conners": [
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0
+                        ]
+                    ],
+                    "Max Size": 0,
+                    "Min Size": 0,
+                    "Module Size": 15.640000343322754
+                }
             ],
-            "Data" : "Hello World"
+            "Alignment Markings": [
+                {
+                    "Origin XY": [
+                        6,
+                        0
+                    ],
+                    "Center XY": [
+                        570,
+                        317
+                    ]
+                },
+                {
+                    "Origin XY": [
+                        6,
+                        0
+                    ],
+                    "Center XY": [
+                        820,
+                        451
+                    ]
+                }
+            ]
         }
     }
 ]

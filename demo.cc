@@ -1,6 +1,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -13,45 +14,54 @@ struct point {
 
 struct qr_position_markings {
     int order;          // 序号
-    point center;       // 中心点坐标
+    struct point center;// 中心点坐标
+    struct point conners[4]; // 4个角点的坐标点, 0是背向码区, 顺时针顺序存放
 
-// 其他信息
+    // 其他信息
     float module_size;  // 模块大小
     int max_size;       // 最大宽度
     int min_size;       // 最小宽度
 };
 
 struct qr_alignment_markings {
-    point relpos;       // 在QR二维码中相对坐标
-    point center;       // 中心点坐标
+    struct point relpos;    // 在QR二维码中相对坐标
+    struct point center;    // 在图中的中心点坐标
 };
 
 struct qr_code_info {
+    // 位置探测图形信息
     int pm_size;                  // 位置探测图形个数
-    qr_position_markings *ppm;    // 位置探测图形信息
+    struct qr_position_markings *ppm;   // 位置探测图形信息
 
+    // 校正图形信息
     int am_size;                  // 校正图形个数
-    qr_alignment_markings *pam;   // 校正图形信息
+    struct qr_alignment_markings *pam;  // 校正图形信息
 
-    bool avaiable;                // QR是否可用，即是否能被解码
-    bool inverse;                 // QR码是否反向
-
+    // 解码信息
+    char *data;                   // 解码后的数据
+    int data_size;                // 解码后的数据长度
+    int codewords_num;            // 码字总数
     int error_codewords;          // 错误的码字数
     int correct_codewords;        // 纠正的错误码字数
-    int data_size;                // 解码后的数据长度
-    char *data;                   // 解码后的数据
+    int mode;                     // 位流的解码模式
 
-    int version;                  // 版本号
-    int ec_level;                 // 纠错级别
-    int mask;                     // 掩膜版本
+    // QR码版本信息和格式信息
+    unsigned char version;        // 版本号 0-40
+    unsigned char ec_level;       // 纠错级别 0:L, 1:M, 2:Q, 3:H
+    unsigned char mask;           // 掩膜版本
+
+    // QR码额外信息
+    bool avaiable;                // QR是否可用，即是否能被解码
+    bool inverse;                 // QR码是否反向
+    bool mirror;                  // QR码是否是反相的
 };
 
-qr_code_info *block_reader(rapidjson::Value &v)
+struct qr_code_info *block_reader(rapidjson::Value &v)
 {
+    struct qr_code_info *info;
+    std::vector<struct qr_position_markings> vqpm;
+    std::vector<struct qr_alignment_markings> vqam;
     rapidjson::Document::ConstMemberIterator itr, itr1, itr2;
-    qr_code_info *info;
-    std::vector<qr_position_markings> vqpm;
-    std::vector<qr_alignment_markings> vqam;
 
     itr = v.FindMember("Code Type");
     if (itr == v.MemberEnd()) {
@@ -95,31 +105,74 @@ qr_code_info *block_reader(rapidjson::Value &v)
     vqpm.clear();
     for (rapidjson::Document::ConstValueIterator vitr = itr1->value.Begin();
             vitr != itr1->value.End(); ++vitr) {
-        int flag = 0x3;
+        int flag = 1;
         qr_position_markings qpm;
 
         std::memset(&qpm, 0, sizeof(qpm));
         for (itr2 = vitr->MemberBegin(); itr2 != vitr->MemberEnd(); ++itr2) {
-            // position markings的成员center{.x, .y}都必须要配置
-            if (std::strcmp(itr2->name.GetString(), "Center X") == 0) {
-                qpm.center.x = itr2->value.GetInt();
-                flag &= ~0x01L;
-            } else if (std::strcmp(itr2->name.GetString(), "Center Y") == 0) {
-                qpm.center.y = itr2->value.GetInt();
-                flag &= ~0x02L;
-            } else if (std::strcmp(itr2->name.GetString(), "Module Size") == 0) {
+            const char *name = itr2->name.GetString();
+            int count = 0;
+
+            if (std::strcmp(name, "Order") == 0 && itr2->value.GetType() == rapidjson::kNumberType) {
+                qpm.order = itr2->value.GetUint();
+            } else if (std::strcmp(name, "Module Size") == 0 && itr2->value.GetType() == rapidjson::kNumberType) {
                 qpm.module_size = itr2->value.GetFloat();
-            } else if (std::strcmp(itr2->name.GetString(), "Order") == 0) {
-                qpm.order = itr2->value.GetInt();
+            } else if (std::strcmp(name, "Center XY") == 0 && itr2->value.GetType() == rapidjson::kArrayType) {
+                for (rapidjson::Document::ConstValueIterator tmp_vitr = itr2->value.Begin();
+                        tmp_vitr != itr2->value.End(); ++tmp_vitr, ++count) {
+                    if (tmp_vitr->GetType() != rapidjson::kNumberType) {
+                        flag = 0;
+                        break;
+                    }
+
+                    if (count == 0) {
+                        qpm.center.x = tmp_vitr->GetUint();
+                    } else {
+                        qpm.center.y = tmp_vitr->GetUint();
+                    }
+                }
+
+                if (count != 2) {
+                    flag = 0;
+                    break;
+                }
+            } else if (std::strcmp(name, "Conners") == 0 && itr2->value.GetType() == rapidjson::kArrayType) {
+                for (rapidjson::Document::ConstValueIterator tmp_vitr1, tmp_vitr = itr2->value.Begin();
+                        tmp_vitr != itr2->value.End(); ++tmp_vitr, ++count) {
+                    /* TODO: 解析角点信息 */
+                    int ec = 0;
+
+                    if (tmp_vitr->GetType() != rapidjson::kArrayType || count >= 4) {
+                        flag = 0;
+                        break;
+                    }
+
+                    for (tmp_vitr1 = tmp_vitr->GetArray().Begin(); tmp_vitr1 != tmp_vitr->GetArray().End(); ++tmp_vitr1, ++ec) {
+                        if (ec == 0) {
+                            qpm.conners[count].x = tmp_vitr1->GetUint();
+                        } else if (ec == 1) {
+                            qpm.conners[count].y = tmp_vitr1->GetUint();
+                        } else {
+                            flag = 0;
+                            break;
+                        }
+                    }
+                }
+
+                if (count != 4) {
+                    flag = 0;
+                    break;
+                }
             } else { // 扩展部分
                 continue;
             }
         }
 
-        if (!flag) {
+        if (flag) {
             vqpm.push_back(qpm);
         }
     }
+
     if (vqpm.size() == 0) {
         delete info;
         return nullptr;
@@ -145,28 +198,44 @@ qr_code_info *block_reader(rapidjson::Value &v)
         vqam.clear();
         for (rapidjson::Document::ConstValueIterator vitr = itr1->value.Begin();
                 vitr != itr1->value.End(); ++vitr) {
-            int flag = 0x3;
+            int flag = 1;
             qr_alignment_markings qam;
 
             std::memset(&qam, 0, sizeof(qam));
             for (itr2 = vitr->MemberBegin(); itr2 != vitr->MemberEnd(); ++itr2) {
-                // position markings的成员center{.x, .y}都必须要配置
-                if (std::strcmp(itr2->name.GetString(), "Center X") == 0) {
-                    qam.center.x = itr2->value.GetInt();
-                    flag &= ~0x01L;
-                } else if (std::strcmp(itr2->name.GetString(), "Center Y") == 0) {
-                    qam.center.y = itr2->value.GetInt();
-                    flag &= ~0x02L;
-                } else if (std::strcmp(itr2->name.GetString(), "Origin X") == 0) {
-                    qam.relpos.x = itr2->value.GetInt();
-                } else if (std::strcmp(itr2->name.GetString(), "Origin X") == 0) {
-                    qam.relpos.y = itr2->value.GetInt();
+                int count = 0;
+                const char *name = itr2->name.GetString();
+                struct point *p;
+
+                if (std::strcmp(name, "Center XY") == 0) {
+                    p = &qam.center;
+                } else if (std::strcmp(name, "Origin XY") == 0) {
+                    p = &qam.relpos;
                 } else { // 扩展部分
                     continue;
                 }
+
+                for (rapidjson::Document::ConstValueIterator tmp_vitr = itr2->value.Begin();
+                        tmp_vitr != itr2->value.End(); ++tmp_vitr, ++count) {
+                    if (tmp_vitr->GetType() != rapidjson::kNumberType) {
+                        flag = 0;
+                        break;
+                    }
+
+                    if (count == 0) {
+                        p->x = tmp_vitr->GetUint();
+                    } else {
+                        p->y = tmp_vitr->GetUint();
+                    }
+                }
+
+                if (count != 2) {
+                    flag = 0;
+                    break;
+                }
             }
 
-            if (!flag) {
+            if (flag) {
                 vqam.push_back(qam);
             }
         }
@@ -186,52 +255,88 @@ qr_code_info *block_reader(rapidjson::Value &v)
 
 int qr_code_info_writer(const char *filename, const std::vector<qr_code_info *> &info)
 {
+    size_t i;
     std::fstream json_file;
-    rapidjson::Document doc;
-    rapidjson::StringBuffer buf;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
-    qr_code_info *pinfo;
+    rapidjson::StringBuffer s;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
 
     if (filename == nullptr || info.size() == 0)
         return -1;
 
-    doc.SetArray();
-    for (size_t j, i = 0; i < info.size(); ++i) {
-        rapidjson::Document code(rapidjson::kObjectType);
-        rapidjson::Value vinfo;
-        rapidjson::Value qr_apm_info_v, qr_code_info_obj;
-
-        pinfo = info[i];
-        if (pinfo == nullptr)
-            continue;
-
-        if (pinfo->pm_size <= 0 || pinfo->ppm == nullptr)
-            continue;
-
-        vinfo.SetString("QR Code");
-        code.AddMember("Code Type", vinfo, doc.GetAllocator());
-        vinfo.SetArray();
-        vinfo.Clear();
-        for (j = 0; j < (size_t)pinfo->pm_size; ++j) {
-            qr_code_info_obj.SetObject();
-            qr_apm_info_v.SetInt(pinfo->ppm[i].center.x);
-            qr_code_info_obj.AddMember("Center X", qr_apm_info_v, doc.GetAllocator());
-            qr_apm_info_v.SetInt(pinfo->ppm[i].center.y);
-            qr_code_info_obj.AddMember("Center Y", qr_apm_info_v, doc.GetAllocator());
-            vinfo.PushBack(qr_code_info_obj, doc.GetAllocator());
-        }
-        code.AddMember("Code Info", vinfo, doc.GetAllocator());
-        doc.PushBack(code, doc.GetAllocator());
-    }
-
-    doc.Accept(writer);
     json_file.open(filename, std::fstream::out);
     if (!json_file.is_open()) {
         return -1;
     }
 
-    json_file << buf.GetString();
+    writer.StartArray();
+    for (i = 0; i < info.size(); ++i) {
+        if (info[i]->pm_size <= 0)
+            continue;
+
+        writer.StartObject();
+        writer.Key("Code Type");
+        writer.String("QR Code");
+        writer.Key("Code Info");
+        writer.StartObject();
+        writer.Key("Position Markings");
+        writer.StartArray();
+        for (int pn = 0; pn < info[i]->pm_size; ++pn) {
+            const struct qr_position_markings &pm = info[i]->ppm[pn];
+
+            writer.StartObject();
+            writer.Key("Order");
+            writer.Uint(pm.order);
+            writer.Key("Center XY");
+            writer.StartArray();
+            writer.Uint(pm.center.x);
+            writer.Uint(pm.center.y);
+            writer.EndArray();
+            writer.Key("Conners");
+            writer.StartArray();
+            for (int cn = 0; cn < 4; ++cn) {
+                writer.StartArray();
+                writer.Uint(pm.conners[cn].x);
+                writer.Uint(pm.conners[cn].y);
+                writer.EndArray();
+            }
+            writer.EndArray();
+            writer.Key("Max Size");
+            writer.Uint(pm.max_size);
+            writer.Key("Min Size");
+            writer.Uint(pm.min_size);
+            writer.Key("Module Size");
+            writer.Double(pm.module_size);
+            writer.EndObject();
+        }
+        writer.EndArray();
+        writer.Key("Alignment Markings");
+        writer.StartArray();
+        for (int pn = 0; pn < info[i]->am_size; ++pn) {
+            const struct qr_alignment_markings &am = info[i]->pam[pn];
+
+            writer.StartObject();
+            writer.Key("Origin XY");
+            writer.StartArray();
+            writer.Uint(am.relpos.x);
+            writer.Uint(am.relpos.y);
+            writer.EndArray();
+            writer.Key("Center XY");
+            writer.StartArray();
+            writer.Uint(am.center.x);
+            writer.Uint(am.center.y);
+            writer.EndArray();
+            writer.EndObject();
+        }
+        writer.EndArray();
+        writer.EndObject();
+        writer.EndObject();
+    }
+    writer.EndArray();
+
+    json_file << s.GetString();
     json_file.close();
+
+    std::cout << s.GetString() << std::endl;
 
     return 0;
 }
@@ -254,12 +359,6 @@ int main(int argc, char *argv[])
     doc.Parse(std::string((std::istreambuf_iterator<char>(json_file)), std::istreambuf_iterator<char>()).c_str());
     json_file.close();
     switch (doc.GetType()) {
-    case rapidjson::kObjectType:
-        {
-            rapidjson::Value v = doc.GetObject();
-            block_reader(v);
-        }
-        break;
     case rapidjson::kArrayType:
         {
             rapidjson::Document::Array m = doc.GetArray();
@@ -272,7 +371,6 @@ int main(int argc, char *argv[])
             }
         }
         break;
-    case rapidjson::kNullType:
     default:
         return -1;
     }
