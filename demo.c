@@ -1,4 +1,4 @@
-#include <json_data_logger.h>
+﻿#include <json_data_logger.h>
 
 int main(int argc, char *argv[])
 {
