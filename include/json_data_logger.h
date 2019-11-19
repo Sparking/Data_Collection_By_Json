@@ -8,6 +8,8 @@ extern "C" {
 #include <string.h>
 #include <stdbool.h>
 
+#define JSON_MAX_QR_COUNT   5   // 一个JSPON文件最多能记录的QR码的数量
+
 typedef struct  {
     int x;
     int y;
@@ -72,6 +74,7 @@ static inline void json_qr_info_clear(void)
 extern int (*const json_qr_code_info_writer)(const char *filename,
         const json_qr_code_info *info, const size_t count);
 
+extern int (*const json_qr_code_info_parser)(const char *filename);
 
 #ifdef __cplusplus
 }

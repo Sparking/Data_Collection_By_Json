@@ -1,22 +1,28 @@
+#include <vector>
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <json_data_logger.h>
 #include <rapidjson/document.h>
 #include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
-#include <json_data_logger.h>
 
 extern int cpp_qr_code_info_writer(const char *filename,
         const json_qr_code_info *info, const size_t count);
 
+extern int cpp_json_qr_code_info_parser(const char *filename);
+
 extern "C" {
-json_qr_code_info g_json_qr_info[5];
+json_qr_code_info g_json_qr_info[JSON_MAX_QR_COUNT];
 size_t g_json_qr_info_count;
+
 int (*const json_qr_code_info_writer)(const char *filename,
         const json_qr_code_info *info, const size_t count)
     = cpp_qr_code_info_writer;
+
+int (*const json_qr_code_info_parser)(const char *filename)
+    = cpp_json_qr_code_info_parser;
 }
 
 int cpp_qr_code_info_writer(const char *filename, const json_qr_code_info *info, const size_t info_count)
@@ -57,8 +63,8 @@ int cpp_qr_code_info_writer(const char *filename, const json_qr_code_info *info,
         writer.Key("Mask");
         writer.Uint(info[i].mask);
         writer.Key("Mode");
-        writer.Uint(info[i].mode);
-        writer.Key("Position Markings Ref Gray");
+        writer.Int(info[i].mode);
+        writer.Key("PM Ref Gray");
         writer.Uint(info[i].pm_grayT);
         writer.Key("Decode Result");
         writer.StartObject();
@@ -134,13 +140,10 @@ int cpp_qr_code_info_writer(const char *filename, const json_qr_code_info *info,
 
     json_file << s.GetString();
     json_file.close();
-
-    std::cout << s.GetString() << std::endl;
-
     return 0;
 }
 
-json_qr_code_info *block_reader(rapidjson::Value &v)
+static json_qr_code_info *block_reader(rapidjson::Value &v)
 {
     json_qr_code_info *info;
     std::vector<json_qr_position_markings> vqpm;
@@ -235,9 +238,16 @@ json_qr_code_info *block_reader(rapidjson::Value &v)
 
     itr1 = itr->value.FindMember("Mode");
     if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
-        info->mode = 0xFF; // 0xFF表示QR的掩膜版本没有设置, 或设置错误
+        info->mode = -1;
     } else {
-        info->mode = itr1->value.GetUint();
+        info->mode = itr1->value.GetInt();
+    }
+
+    itr1 = itr->value.FindMember("PM Ref Gray");
+    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+        info->pm_grayT = 0xFF; // 0xFF
+    } else {
+        info->pm_grayT = itr1->value.GetUint();
     }
 
     itr1 = itr->value.FindMember("Decode Result");
@@ -452,18 +462,19 @@ json_qr_code_info *block_reader(rapidjson::Value &v)
     return info;
 }
 
-int main(int argc, char *argv[])
+int cpp_json_qr_code_info_parser(const char *filename)
 {
     std::string vstr;
     std::fstream json_file;
     rapidjson::Document doc;
     std::vector<json_qr_code_info *> info;
     json_qr_code_info *pinfo;
+    size_t count;
 
-    if (argc < 2)
+    if (filename == nullptr)
         return -1;
 
-    json_file.open(argv[1], std::fstream::in);
+    json_file.open(filename, std::fstream::in);
     if (!json_file.is_open())
         return -1;
 
@@ -487,20 +498,32 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    json_qr_info_clear();
-    for (g_json_qr_info_count = 0; g_json_qr_info_count < info.size(); ++g_json_qr_info_count) {
-        std::memcpy(g_json_qr_info + g_json_qr_info_count, info[g_json_qr_info_count], sizeof(g_json_qr_info[0]));
+    if (info.size() >= JSON_MAX_QR_COUNT) {
+        count = JSON_MAX_QR_COUNT;
+    } else {
+        count = info.size();
+        if (count == 0) {
+            json_qr_info_clear();
+            return -1;
+        }
     }
-    json_qr_code_info_writer("test.json", g_json_qr_info, g_json_qr_info_count);
-    for (size_t i = 0; i < info.size(); ++i) {
-        pinfo = info[i];
+
+    for (g_json_qr_info_count = 0; g_json_qr_info_count < count; ++g_json_qr_info_count) {
+        memcpy(g_json_qr_info + g_json_qr_info_count, info[g_json_qr_info_count], sizeof(g_json_qr_info[0]));
+    }
+
+    for (count = 0; count < info.size(); ++count) {
+        pinfo = info[count];
         if (pinfo != nullptr) {
             delete[] pinfo->ppm;
             delete[] pinfo->pam;
-            free(pinfo->text);
+            if (pinfo->text != nullptr) {
+                free(pinfo->text);
+            }
+
             delete[] pinfo;
         }
     }
 
-	return 0;
+    return 0;
 }

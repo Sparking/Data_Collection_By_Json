@@ -8,7 +8,8 @@
             "Version": 21,
             "Error Correction Level": 1,
             "Mask": 4,
-            "Mode": 1,
+            "Mode": 3,
+            "PM Ref Gray" : 13,
             "Decode Result": {
                 "Text": "https://www.google.com/",
                 "Text Length": 23,
