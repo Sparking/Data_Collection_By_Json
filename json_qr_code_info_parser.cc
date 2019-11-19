@@ -8,24 +8,18 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
 
-extern int cpp_qr_code_info_writer(const char *filename,
-        const json_qr_code_info *info, const size_t count);
-
-extern int cpp_json_qr_code_info_parser(const char *filename);
-
 extern "C" {
 json_qr_code_info g_json_qr_info[JSON_MAX_QR_COUNT];
 size_t g_json_qr_info_count;
-
-int (*const json_qr_code_info_writer)(const char *filename,
-        const json_qr_code_info *info, const size_t count)
-    = cpp_qr_code_info_writer;
-
-int (*const json_qr_code_info_parser)(const char *filename)
-    = cpp_json_qr_code_info_parser;
 }
 
-int cpp_qr_code_info_writer(const char *filename, const json_qr_code_info *info, const size_t info_count)
+extern "C" void json_qr_info_clear(void)
+{
+    memset(g_json_qr_info, 0, sizeof(g_json_qr_info));
+    g_json_qr_info_count = 0;
+}
+
+extern "C" int json_qr_code_info_writer(const char *filename, const json_qr_code_info *info, const size_t info_count)
 {
     size_t i;
     std::fstream json_file;
@@ -462,7 +456,7 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
     return info;
 }
 
-int cpp_json_qr_code_info_parser(const char *filename)
+extern "C" int json_qr_code_info_parser(const char *filename)
 {
     std::string vstr;
     std::fstream json_file;

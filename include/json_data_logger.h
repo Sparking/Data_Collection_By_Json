@@ -62,19 +62,15 @@ typedef struct {
     unsigned char pm_grayT;       // 位置探测图形参考灰度值
 } json_qr_code_info;
 
-extern json_qr_code_info g_json_qr_info[5];
+extern json_qr_code_info g_json_qr_info[JSON_MAX_QR_COUNT];
 extern size_t g_json_qr_info_count;
 
-static inline void json_qr_info_clear(void)
-{
-    memset(g_json_qr_info, 0, sizeof(g_json_qr_info));
-    g_json_qr_info_count = 0;
-}
+extern void json_qr_info_clear(void);
 
-extern int (*const json_qr_code_info_writer)(const char *filename,
+extern int json_qr_code_info_writer(const char *filename,
         const json_qr_code_info *info, const size_t count);
 
-extern int (*const json_qr_code_info_parser)(const char *filename);
+extern int json_qr_code_info_parser(const char *filename);
 
 #ifdef __cplusplus
 }
