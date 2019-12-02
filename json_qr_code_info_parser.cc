@@ -104,7 +104,7 @@ extern "C" int json_qr_code_info_writer(const char *filename,
         writer.Key("Code Info");
         writer.StartObject();
         writer.Key("Avaiable");
-        writer.Bool(info[i].Avaiable);
+        writer.Bool(info[i].available);
         writer.Key("Mirror");
         writer.Bool(info[i].mirror);
         writer.Key("Inverse");
@@ -231,9 +231,9 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
     if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
             && itr1->value.GetType() != rapidjson::kTrueType)) {
        // 没有设置, 则默认不可解码
-        info->Avaiable = false;
+        info->available = false;
     } else {
-        info->Avaiable = itr1->value.GetBool();
+        info->available = itr1->value.GetBool();
     }
 
     itr1 = itr->value.FindMember("Mirror");

@@ -48,7 +48,7 @@ typedef struct {
     unsigned char mask;           /* 掩膜版本 */
 
     /**QR码额外信息**/
-    bool avaiable;                /* QR是否可用，即是否能被解码 */
+    bool available;               /* QR是否可用，即是否能被解码 */
     bool inverse;                 /* QR码是否反向 */
     bool mirror;                  /* QR码是否是反相的 */
     unsigned char pos_style;      /* QR摆放顺序 */
