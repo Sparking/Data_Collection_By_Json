@@ -8,8 +8,6 @@ CPPFLAGS := -Wall -Werror -ansi -MMD -I$(CURDIR)/include
 LDFLAGS  := -Wl,--as-needed -Wl,-gc-section -L$(CURDIR)
 LIBS     :=
 
-#JSON_C_PATH := D:/Software/GNU/json-c
-
 ifeq ($(OS),Windows_NT)
 CPPFLAGS += -I$(JSON_C_PATH)/include
 LDFLAGS  += -L$(JSON_C_PATH)/lib

@@ -1,39 +1,98 @@
-﻿#include <vector>
+﻿#include <time.h>
+#include <vector>
 #include <string>
 #include <fstream>
 #include <iostream>
 #include <json_data_logger.h>
 #include <rapidjson/document.h>
 #include <rapidjson/writer.h>
+#include <rapidjson/reader.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
+#include <rapidjson/ostreamwrapper.h>
 
 extern "C" {
 json_qr_code_info g_json_qr_info[JSON_MAX_QR_COUNT];
-size_t g_json_qr_info_count;
+unsigned int g_json_qr_info_count = 0;
 }
 
 extern "C" void json_qr_info_clear(void)
 {
+    while (g_json_qr_info_count-- > 0) {
+        if (g_json_qr_info[g_json_qr_info_count].pam) {
+            delete[] g_json_qr_info[g_json_qr_info_count].pam;
+        }
+
+        if (g_json_qr_info[g_json_qr_info_count].ppm) {
+            delete[] g_json_qr_info[g_json_qr_info_count].ppm;
+        }
+    }
     memset(g_json_qr_info, 0, sizeof(g_json_qr_info));
     g_json_qr_info_count = 0;
 }
 
-extern "C" int json_qr_code_info_writer(const char *filename, const json_qr_code_info *info, const size_t info_count)
+extern "C" int json_qr_code_info_writer(const char *filename,
+        const json_qr_code_info *info, const unsigned int info_count)
 {
-    size_t i;
+    time_t tmt;
+    struct tm cur_tm;
+    char date[100];
+    unsigned int i;
     std::fstream json_file;
-    rapidjson::StringBuffer s;
+    rapidjson::Document doc;
+    rapidjson::Document new_doc;
+    rapidjson::Document::AllocatorType &allocator = doc.GetAllocator();
+    rapidjson::StringBuffer s, new_s;
     rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> prettywriter(new_s);
 
     if (filename == nullptr || info == nullptr || info_count == 0)
         return -1;
 
-    json_file.open(filename, std::fstream::out);
+    time(&tmt);
+#ifdef __linux__
+    localtime_r((time_t *)&tmt, &cur_tm);
+#else
+    localtime_s(&cur_tm, (time_t *)&tmt);
+#endif
+#if 0
+    snprintf(date, sizeof(date), "%s.%04d-%02d-%02d.%02d.%02d.%02d.json",
+        filename, cur_tm.tm_year + 1900, cur_tm.tm_mon, cur_tm.tm_mday,
+        cur_tm.tm_hour, cur_tm.tm_min, cur_tm.tm_sec);
+
+    json_file.open(date, std::fstream::out);
     if (!json_file.is_open()) {
         return -1;
     }
+#else
+    snprintf(date, sizeof(date), "%04d-%02d-%02d %02d:%02d:%02d",
+        cur_tm.tm_year + 1900, cur_tm.tm_mon, cur_tm.tm_mday,
+        cur_tm.tm_hour, cur_tm.tm_min, cur_tm.tm_sec);
 
+    json_file.open(filename, std::ios_base::app | std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+    if (!json_file.is_open()) {
+        return -1;
+    }
+    doc.Parse(std::string((std::istreambuf_iterator<char>(json_file)),
+            std::istreambuf_iterator<char>()).c_str());
+    if (doc.GetType() == rapidjson::kNullType) {
+        doc.Parse("[]");
+        (void)allocator;
+    }
+    json_file.close();
+    if (doc.GetType() != rapidjson::kArrayType) {
+        return -1;
+    }
+    json_file.open(filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+    if (!json_file.is_open()) {
+        return -1;
+    }
+#endif
+
+    writer.StartObject();
+    writer.Key("Time Stamp");
+    writer.String(date);
+    writer.Key("Codes");
     writer.StartArray();
     for (i = 0; i < info_count; ++i) {
         if (info[i].pm_size <= 0)
@@ -45,7 +104,7 @@ extern "C" int json_qr_code_info_writer(const char *filename, const json_qr_code
         writer.Key("Code Info");
         writer.StartObject();
         writer.Key("Avaiable");
-        writer.Bool(info[i].avaiable);
+        writer.Bool(info[i].Avaiable);
         writer.Key("Mirror");
         writer.Bool(info[i].mirror);
         writer.Key("Inverse");
@@ -56,26 +115,16 @@ extern "C" int json_qr_code_info_writer(const char *filename, const json_qr_code
         writer.Uint(info[i].ec_level);
         writer.Key("Mask");
         writer.Uint(info[i].mask);
-        writer.Key("Mode");
-        writer.Int(info[i].mode);
         writer.Key("PM Ref Gray");
         writer.Uint(info[i].pm_grayT);
-        writer.Key("Decode Result");
+        writer.Key("Decode Info");
         writer.StartObject();
-        writer.Key("Text");
-        if (info[i].text == nullptr) {
-            writer.Null();
-        } else {
-            writer.String(info[i].text);
-        }
         writer.Key("Text Length");
         writer.Uint(info[i].text_length);
         writer.Key("Codewords Total Size");
         writer.Uint(info[i].codewords_num);
         writer.Key("Error Codewords");
         writer.Uint(info[i].error_codewords);
-        writer.Key("Corrected Codewords");
-        writer.Uint(info[i].correct_codewords);
         writer.EndObject();
         writer.Key("Position Markings");
         writer.StartArray();
@@ -131,12 +180,18 @@ extern "C" int json_qr_code_info_writer(const char *filename, const json_qr_code
         writer.EndObject();
     }
     writer.EndArray();
-
-    json_file << s.GetString();
+    writer.EndObject();
+    new_doc.Parse(s.GetString());
+    auto obj = new_doc.GetObject();
+    doc.PushBack(obj, allocator);
+    doc.Accept(prettywriter);
+    json_file << new_s.GetString() << std::endl;
     json_file.close();
+
     return 0;
 }
 
+#if 1
 static json_qr_code_info *block_reader(rapidjson::Value &v)
 {
     json_qr_code_info *info;
@@ -176,9 +231,9 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
     if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
             && itr1->value.GetType() != rapidjson::kTrueType)) {
        // 没有设置, 则默认不可解码
-        info->avaiable = false;
+        info->Avaiable = false;
     } else {
-        info->avaiable = itr1->value.GetBool();
+        info->Avaiable = itr1->value.GetBool();
     }
 
     itr1 = itr->value.FindMember("Mirror");
@@ -230,13 +285,6 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
         }
     }
 
-    itr1 = itr->value.FindMember("Mode");
-    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
-        info->mode = -1;
-    } else {
-        info->mode = itr1->value.GetInt();
-    }
-
     itr1 = itr->value.FindMember("PM Ref Gray");
     if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
         info->pm_grayT = 0xFF; // 0xFF
@@ -244,30 +292,15 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
         info->pm_grayT = itr1->value.GetUint();
     }
 
-    itr1 = itr->value.FindMember("Decode Result");
+    itr1 = itr->value.FindMember("Decode Info");
     if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kObjectType) {
-        info->text = nullptr;
         info->text_length = 0;
         info->codewords_num = 0;
         info->error_codewords = 0;
-        info->correct_codewords = 0;
     } else {
-        itr2 = itr1->value.FindMember("Text");
-        if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kStringType) {
-#if defined(__GNUC__)
-            info->text = strdup(itr2->value.GetString());
-#else
-            info->text = _strdup(itr2->value.GetString());
-#endif
-        } else {
-            info->text = nullptr;
-        }
-
         itr2 = itr1->value.FindMember("Text Length");
         if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kNumberType) {
             info->text_length = itr2->value.GetUint();
-        } else if (info->text != nullptr) {
-            info->text_length = strlen(info->text);
         } else {
             info->text_length = 0;
         }
@@ -284,13 +317,6 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
             info->error_codewords = itr2->value.GetUint();
         } else {
             info->error_codewords = 0;
-        }
-
-        itr2 = itr1->value.FindMember("Corrected Codewords");
-        if (itr2 != itr1->value.MemberEnd() && itr2->value.GetType() == rapidjson::kNumberType) {
-            info->correct_codewords = itr2->value.GetUint();
-        } else {
-            info->correct_codewords = info->error_codewords;
         }
     }
 
@@ -312,11 +338,14 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
             const char *name = itr2->name.GetString();
             int count = 0;
 
-            if (std::strcmp(name, "Order") == 0 && itr2->value.GetType() == rapidjson::kNumberType) {
+            if (std::strcmp(name, "Order") == 0
+                    && itr2->value.GetType() == rapidjson::kNumberType) {
                 qpm.order = itr2->value.GetUint();
-            } else if (std::strcmp(name, "Module Size") == 0 && itr2->value.GetType() == rapidjson::kNumberType) {
+            } else if (std::strcmp(name, "Module Size") == 0
+                    && itr2->value.GetType() == rapidjson::kNumberType) {
                 qpm.module_size = itr2->value.GetFloat();
-            } else if (std::strcmp(name, "Center XY") == 0 && itr2->value.GetType() == rapidjson::kArrayType) {
+            } else if (std::strcmp(name, "Center XY") == 0
+                    && itr2->value.GetType() == rapidjson::kArrayType) {
                 for (rapidjson::Document::ConstValueIterator tmp_vitr = itr2->value.Begin();
                         tmp_vitr != itr2->value.End(); ++tmp_vitr, ++count) {
                     if (tmp_vitr->GetType() != rapidjson::kNumberType) {
@@ -335,7 +364,8 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
                     flag = 0;
                     break;
                 }
-            } else if (std::strcmp(name, "Conners") == 0 && itr2->value.GetType() == rapidjson::kArrayType) {
+            } else if (std::strcmp(name, "Conners") == 0
+                    && itr2->value.GetType() == rapidjson::kArrayType) {
                 for (rapidjson::Document::ConstValueIterator tmp_vitr1, tmp_vitr = itr2->value.Begin();
                         tmp_vitr != itr2->value.End(); ++tmp_vitr, ++count) {
                     /* TODO: 解析角点信息 */
@@ -346,7 +376,8 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
                         break;
                     }
 
-                    for (tmp_vitr1 = tmp_vitr->GetArray().Begin(); tmp_vitr1 != tmp_vitr->GetArray().End(); ++tmp_vitr1, ++ec) {
+                    for (tmp_vitr1 = tmp_vitr->GetArray().Begin();
+                            tmp_vitr1 != tmp_vitr->GetArray().End(); ++tmp_vitr1, ++ec) {
                         if (ec == 0) {
                             qpm.corners[count].x = tmp_vitr1->GetUint();
                         } else if (ec == 1) {
@@ -387,7 +418,7 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
         delete info;
         return nullptr;
     }
-    for (size_t i = 0; i < vqpm.size(); ++i)
+    for (unsigned int i = 0; i < vqpm.size(); ++i)
         std::memcpy(info->ppm + i, &vqpm[i], sizeof(info->ppm[0]));
 
     /* 校正图形解析区 */
@@ -447,7 +478,7 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
             info->pam = new json_qr_alignment_markings[vqam.size()];
             if (info->pam != nullptr) {
                 info->am_size = vqam.size();
-                for (size_t i = 0; i < vqam.size(); ++i)
+                for (unsigned int i = 0; i < vqam.size(); ++i)
                     std::memcpy(info->pam + i, &vqam[i], sizeof(info->pam[0]));
             }
         }
@@ -459,11 +490,11 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
 extern "C" int json_qr_code_info_parser(const char *filename)
 {
     std::string vstr;
+    unsigned int count;
     std::fstream json_file;
     rapidjson::Document doc;
-    std::vector<json_qr_code_info *> info;
     json_qr_code_info *pinfo;
-    size_t count;
+    std::vector<json_qr_code_info *> info;
 
     if (filename == nullptr)
         return -1;
@@ -476,7 +507,7 @@ extern "C" int json_qr_code_info_parser(const char *filename)
     json_file.close();
     switch (doc.GetType()) {
     case rapidjson::kArrayType:
-        {
+        do {
             rapidjson::Document::Array m = doc.GetArray();
             rapidjson::Document::ValueIterator it = m.Begin();
 
@@ -486,7 +517,7 @@ extern "C" int json_qr_code_info_parser(const char *filename)
                     info.push_back(pinfo);
                 ++it;
             }
-        }
+        } while (0);
         break;
     default:
         return -1;
@@ -502,22 +533,19 @@ extern "C" int json_qr_code_info_parser(const char *filename)
         }
     }
 
-    for (g_json_qr_info_count = 0; g_json_qr_info_count < count; ++g_json_qr_info_count) {
-        memcpy(g_json_qr_info + g_json_qr_info_count, info[g_json_qr_info_count], sizeof(g_json_qr_info[0]));
+    for (g_json_qr_info_count = 0; g_json_qr_info_count < count;
+            ++g_json_qr_info_count) {
+        memcpy(g_json_qr_info + g_json_qr_info_count,
+                info[g_json_qr_info_count], sizeof(g_json_qr_info[0]));
     }
 
     for (count = 0; count < info.size(); ++count) {
         pinfo = info[count];
         if (pinfo != nullptr) {
-            delete[] pinfo->ppm;
-            delete[] pinfo->pam;
-            if (pinfo->text != nullptr) {
-                free(pinfo->text);
-            }
-
-            delete[] pinfo;
+            delete pinfo;
         }
     }
 
     return 0;
 }
+#endif
