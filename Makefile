@@ -19,7 +19,7 @@ else
 OUT      := run
 endif
 
-JSON_QR_SRC := json_qr_code_info_parser.cc
+JSON_QR_SRC := json_data_logger.cc json_qr_code_info_parser.cc
 JSON_QR_OBJ := $(patsubst %.cc,%.o,$(JSON_QR_SRC))
 JSON_QR_DEP := $(patsubst %.cc,%.d,$(JSON_QR_SRC))
 

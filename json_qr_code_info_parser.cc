@@ -1,6 +1,4 @@
-﻿#include <time.h>
-#include <vector>
-#include <string>
+﻿#include <vector>
 #include <fstream>
 #include <iostream>
 #include <json_data_logger.h>
@@ -9,81 +7,35 @@
 #include <rapidjson/reader.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
-#include <rapidjson/ostreamwrapper.h>
 
-extern "C" {
-json_qr_code_info g_json_qr_info[JSON_MAX_QR_COUNT];
-unsigned int g_json_qr_info_count = 0;
-}
-
-extern "C" void json_qr_info_clear(void)
+extern "C" void json_qr_info_clear(json_qr_code_info *info,
+        const unsigned int info_count)
 {
-    while (g_json_qr_info_count-- > 0) {
-        if (g_json_qr_info[g_json_qr_info_count].pam) {
-            delete[] g_json_qr_info[g_json_qr_info_count].pam;
+    unsigned int i;
+
+    i = info_count;
+    while (i-- > 0) {
+        if (info[i].pam) {
+            delete[] info[i].pam;
         }
 
-        if (g_json_qr_info[g_json_qr_info_count].ppm) {
-            delete[] g_json_qr_info[g_json_qr_info_count].ppm;
+        if (info[i].ppm) {
+            delete[] info[i].ppm;
         }
     }
-    memset(g_json_qr_info, 0, sizeof(g_json_qr_info));
-    g_json_qr_info_count = 0;
+    memset(info, 0, sizeof(*info) * info_count);
 }
 
-extern "C" int json_qr_code_info_writer(const char *filename,
-        const json_qr_code_info *info, const unsigned int info_count)
+std::string json_qr_code_info_to_json_string(const json_qr_code_info *info,
+        const unsigned int info_count)
 {
-    time_t tmt;
-    struct tm cur_tm;
-    char date[100];
     unsigned int i;
-    std::fstream json_file;
     rapidjson::StringBuffer s;
     rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
 
-    if (filename == nullptr || info == nullptr || info_count == 0)
-        return -1;
-
-    time(&tmt);
-#ifdef __linux__
-    localtime_r((time_t *)&tmt, &cur_tm);
-#else
-    localtime_s(&cur_tm, (time_t *)&tmt);
-#endif
-#if 1
-    snprintf(date, sizeof(date), "%s.%04d-%02d-%02d.%02d.%02d.%02d.json",
-        filename, cur_tm.tm_year + 1900, cur_tm.tm_mon, cur_tm.tm_mday,
-        cur_tm.tm_hour, cur_tm.tm_min, cur_tm.tm_sec);
-
-    json_file.open(date, std::fstream::out);
-    if (!json_file.is_open()) {
-        return -1;
+    if (info == nullptr || info_count == 0) {
+        return std::string("");
     }
-#else
-    snprintf(date, sizeof(date), "%04d-%02d-%02d %02d:%02d:%02d",
-        cur_tm.tm_year + 1900, cur_tm.tm_mon, cur_tm.tm_mday,
-        cur_tm.tm_hour, cur_tm.tm_min, cur_tm.tm_sec);
-
-    json_file.open(filename, std::ios_base::app | std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-    if (!json_file.is_open()) {
-        return -1;
-    }
-    doc.Parse(std::string((std::istreambuf_iterator<char>(json_file)),
-            std::istreambuf_iterator<char>()).c_str());
-    if (doc.GetType() == rapidjson::kNullType) {
-        doc.Parse("[]");
-        (void)allocator;
-    }
-    json_file.close();
-    if (doc.GetType() != rapidjson::kArrayType) {
-        return -1;
-    }
-    json_file.open(filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-    if (!json_file.is_open()) {
-        return -1;
-    }
-#endif
 
     writer.StartArray();
     for (i = 0; i < info_count; ++i) {
@@ -174,48 +126,68 @@ extern "C" int json_qr_code_info_writer(const char *filename,
         writer.EndObject();
     }
     writer.EndArray();
-    json_file << s.GetString() << std::endl;
-    json_file.close();
+
+    return std::string(s.GetString());
+}
+
+extern "C" int json_qr_code_info_writer(const char *filename,
+        const json_qr_code_info *info, const unsigned int info_count)
+{
+    std::fstream json_fs;
+
+    if (filename == nullptr || info == nullptr || info_count == 0) {
+        return -1;
+    }
+
+    json_fs.open(filename, std::ios_base::out | std::ios_base::trunc);
+    if (!json_fs.is_open()) {
+        return -1;
+    }
+
+    std::string jarray = json_qr_code_info_to_json_string(info, info_count);
+    if (jarray.size() == 0) {
+        json_fs.close();
+        return -1;
+    }
+    json_fs << jarray << std::endl;
+    json_fs.close();
 
     return 0;
 }
 
-#if 1
-static json_qr_code_info *block_reader(rapidjson::Value &v)
+int json_parse_qr_object(rapidjson::Value &v, json_qr_code_info *info)
 {
-    json_qr_code_info *info;
+    unsigned int i;
     std::vector<json_qr_position_markings> vqpm;
     std::vector<json_qr_alignment_markings> vqam;
     rapidjson::Document::ConstMemberIterator itr, itr1, itr2;
 
+    if (info == nullptr)
+        return -1;
+
     itr = v.FindMember("Code Type");
     if (itr == v.MemberEnd()) {
         std::cerr << "Can't find member [Code Type]" << std::endl;
-        return nullptr;
+        return -1;
     }
 
     if (itr->value.GetType() != rapidjson::kStringType
             || std::strcmp(itr->value.GetString(), "QR Code") != 0) {
-        std::cerr << "Code Type is not QR Code" << std::endl;
-        return nullptr;
+        return -1;
     }
 
     itr = v.FindMember("Code Info");
     if (itr == v.MemberEnd()) {
         std::cerr << "Can't find member [Code Info]" << std::endl;
-        return nullptr;
+        return -1;
     }
 
     if (itr->value.GetType() != rapidjson::kObjectType) {
         std::cerr << "Code Info should be an object" << std::endl;
-        return nullptr;
+        return -1;
     }
 
-    info = new json_qr_code_info;
-    if (info == nullptr)
-        return nullptr;
     std::memset(info, 0, sizeof(*info));
-
     itr1 = itr->value.FindMember("Model");
     if (itr1 == itr->value.MemberEnd()
             || (itr1->value.GetType() != rapidjson::kNumberType)) {
@@ -320,8 +292,7 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
     itr1 = itr->value.FindMember("Position Markings");
     if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kArrayType) {
         std::cerr << "Code Info Should contain Position Markings info at least" << std::endl;
-        delete info;
-        return nullptr;
+        return -1;
     }
 
     vqpm.clear();
@@ -405,17 +376,14 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
     }
 
     if (vqpm.size() == 0) {
-        delete info;
-        return nullptr;
+        return -1;
     }
 
     info->pm_size = vqpm.size();
     info->ppm = new json_qr_position_markings[info->pm_size];
-    if (info->ppm == nullptr) {
-        delete info;
-        return nullptr;
-    }
-    for (unsigned int i = 0; i < vqpm.size(); ++i)
+    if (info->ppm == nullptr)
+        return -1;
+    for (i = 0; i < vqpm.size(); ++i)
         std::memcpy(info->ppm + i, &vqpm[i], sizeof(info->ppm[0]));
 
     /* 校正图形解析区 */
@@ -423,7 +391,9 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
     if (itr1 != itr->value.MemberEnd()) {
         if (itr1->value.GetType() != rapidjson::kArrayType) {
             std::cerr << "Code Info should be an object" << std::endl;
-            return nullptr;
+            delete[] info->ppm;
+            info->ppm = nullptr;
+            return -1;
         }
 
         vqam.clear();
@@ -475,32 +445,34 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
             info->pam = new json_qr_alignment_markings[vqam.size()];
             if (info->pam != nullptr) {
                 info->am_size = vqam.size();
-                for (unsigned int i = 0; i < vqam.size(); ++i)
+                for (i = 0; i < vqam.size(); ++i)
                     std::memcpy(info->pam + i, &vqam[i], sizeof(info->pam[0]));
             }
         }
     } /* End of If */
 
-    return info;
+    return 0;
 }
 
-extern "C" int json_qr_code_info_parser(const char *filename)
+extern "C" int json_qr_code_info_parser(const char *filename,
+        json_qr_code_info *jinfo, const unsigned int jcount)
 {
     std::string vstr;
-    unsigned int count;
+    unsigned int count, off;
     std::fstream json_file;
     rapidjson::Document doc;
     json_qr_code_info *pinfo;
     std::vector<json_qr_code_info *> info;
 
-    if (filename == nullptr)
-        return -1;
+    if (filename == nullptr || jinfo == nullptr || jcount == 0)
+        return 0;
 
     json_file.open(filename, std::fstream::in);
     if (!json_file.is_open())
-        return -1;
+        return 0;
 
-    doc.Parse(std::string((std::istreambuf_iterator<char>(json_file)), std::istreambuf_iterator<char>()).c_str());
+    doc.Parse(std::string((std::istreambuf_iterator<char>(json_file)),
+            std::istreambuf_iterator<char>()).c_str());
     json_file.close();
     switch (doc.GetType()) {
     case rapidjson::kArrayType:
@@ -509,40 +481,36 @@ extern "C" int json_qr_code_info_parser(const char *filename)
             rapidjson::Document::ValueIterator it = m.Begin();
 
             while (it != m.End()) {
-                pinfo = block_reader(*it);
-                if (pinfo != nullptr)
+                pinfo = new json_qr_code_info;
+                if (pinfo != nullptr && json_parse_qr_object(*it, pinfo) == 0) {
                     info.push_back(pinfo);
+                } else {
+                    delete pinfo;
+                }
                 ++it;
             }
         } while (0);
         break;
     default:
-        return -1;
+        return 0;
     }
 
-    if (info.size() >= JSON_MAX_QR_COUNT) {
-        count = JSON_MAX_QR_COUNT;
+    if (info.size() >= jcount) {
+        count = jcount;
     } else {
         count = info.size();
-        if (count == 0) {
-            json_qr_info_clear();
-            return -1;
-        }
+        if (count == 0)
+            return 0;
     }
 
-    for (g_json_qr_info_count = 0; g_json_qr_info_count < count;
-            ++g_json_qr_info_count) {
-        memcpy(g_json_qr_info + g_json_qr_info_count,
-                info[g_json_qr_info_count], sizeof(g_json_qr_info[0]));
-    }
+    for (off = 0; off < count; ++off)
+        memcpy(jinfo + off, info[off], sizeof(*jinfo));
 
-    for (count = 0; count < info.size(); ++count) {
-        pinfo = info[count];
-        if (pinfo != nullptr) {
+    for (off = 0; off < info.size(); ++off) {
+        pinfo = info[off];
+        if (pinfo != nullptr)
             delete pinfo;
-        }
     }
 
-    return 0;
+    return count;
 }
-#endif

@@ -3,12 +3,14 @@
 #include "json_data_logger_types.h"
 
 #ifdef __cplusplus
+#include <string.h>
+
 extern "C" {
 #endif
 
 #include <stdbool.h>
 
-#define JSON_MAX_QR_COUNT   5   /* 一个JSPON文件最多能记录的QR码的数量 */
+#define JSON_MAX_QR_COUNT   15   /* 一个JSPON文件最多能记录的QR码的数量 */
 
 typedef struct {
     int order;              /* 序号 */
@@ -58,18 +60,21 @@ typedef struct {
     unsigned char model;          /* QR码版本, 0: 未知版本, 1: QR Model1, 2: QR Model2, 3: MarcoQR */
 } json_qr_code_info;
 
-extern json_qr_code_info g_json_qr_info[JSON_MAX_QR_COUNT];
-extern unsigned int g_json_qr_info_count;
-
-extern void json_qr_info_clear(void);
+extern void json_qr_info_clear(json_qr_code_info *info,
+        const unsigned int info_count);
 
 extern int json_qr_code_info_writer(const char *filename,
         const json_qr_code_info *info, const unsigned int count);
-#if 1
-extern int json_qr_code_info_parser(const char *filename);
-#endif
+
+extern int json_qr_code_info_parser(const char *filename,
+        json_qr_code_info *info, const unsigned int count);
 
 #ifdef __cplusplus
+
+extern int json_parse_qr_object(rapidjson::Value &v, json_qr_code_info *info);
+
+extern std::string json_qr_code_info_to_json_string(const json_qr_code_info *info,
+        const unsigned int info_count);
 }
 #endif
 
