@@ -39,12 +39,8 @@ extern "C" int json_qr_code_info_writer(const char *filename,
     char date[100];
     unsigned int i;
     std::fstream json_file;
-    rapidjson::Document doc;
-    rapidjson::Document new_doc;
-    rapidjson::Document::AllocatorType &allocator = doc.GetAllocator();
-    rapidjson::StringBuffer s, new_s;
+    rapidjson::StringBuffer s;
     rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(s);
-    rapidjson::PrettyWriter<rapidjson::StringBuffer> prettywriter(new_s);
 
     if (filename == nullptr || info == nullptr || info_count == 0)
         return -1;
@@ -55,7 +51,7 @@ extern "C" int json_qr_code_info_writer(const char *filename,
 #else
     localtime_s(&cur_tm, (time_t *)&tmt);
 #endif
-#if 0
+#if 1
     snprintf(date, sizeof(date), "%s.%04d-%02d-%02d.%02d.%02d.%02d.json",
         filename, cur_tm.tm_year + 1900, cur_tm.tm_mon, cur_tm.tm_mday,
         cur_tm.tm_hour, cur_tm.tm_min, cur_tm.tm_sec);
@@ -89,10 +85,6 @@ extern "C" int json_qr_code_info_writer(const char *filename,
     }
 #endif
 
-    writer.StartObject();
-    writer.Key("Time Stamp");
-    writer.String(date);
-    writer.Key("Codes");
     writer.StartArray();
     for (i = 0; i < info_count; ++i) {
         if (info[i].pm_size <= 0)
@@ -103,6 +95,8 @@ extern "C" int json_qr_code_info_writer(const char *filename,
         writer.String("QR Code");
         writer.Key("Code Info");
         writer.StartObject();
+        writer.Key("Model");
+        writer.Uint(info[i].model);
         writer.Key("Avaiable");
         writer.Bool(info[i].available);
         writer.Key("Mirror");
@@ -180,12 +174,7 @@ extern "C" int json_qr_code_info_writer(const char *filename,
         writer.EndObject();
     }
     writer.EndArray();
-    writer.EndObject();
-    new_doc.Parse(s.GetString());
-    auto obj = new_doc.GetObject();
-    doc.PushBack(obj, allocator);
-    doc.Accept(prettywriter);
-    json_file << new_s.GetString() << std::endl;
+    json_file << s.GetString() << std::endl;
     json_file.close();
 
     return 0;
@@ -226,6 +215,14 @@ static json_qr_code_info *block_reader(rapidjson::Value &v)
     if (info == nullptr)
         return nullptr;
     std::memset(info, 0, sizeof(*info));
+
+    itr1 = itr->value.FindMember("Model");
+    if (itr1 == itr->value.MemberEnd()
+            || (itr1->value.GetType() != rapidjson::kNumberType)) {
+        info->model = 0;
+    } else {
+        info->model = itr1->value.GetUint();
+    }
 
     itr1 = itr->value.FindMember("Avaiable");
     if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType

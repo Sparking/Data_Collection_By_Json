@@ -37,7 +37,7 @@ typedef struct {
     json_qr_alignment_markings *pam;  /* 校正图形信息 */
 
     /**解码信息**/
-    /* char *text; */             /* 解码后的数据, 无需记录 */
+    /* char *text; */             /* 解码后的数据, 无需记录, 因为有二进制的内容 */
     int text_length;              /* 解码后的数据长度 */
     int codewords_num;            /* 码字总数 */
     int error_codewords;          /* 错误的码字数 */
@@ -53,6 +53,9 @@ typedef struct {
     bool mirror;                  /* QR码是否是反相的 */
     unsigned char pos_style;      /* QR摆放顺序 */
     unsigned char pm_grayT;       /* 位置探测图形参考灰度值 */
+
+    /**QR码的版本**/
+    unsigned char model;          /* QR码版本, 0: 未知版本, 1: QR Model1, 2: QR Model2, 3: MarcoQR */
 } json_qr_code_info;
 
 extern json_qr_code_info g_json_qr_info[JSON_MAX_QR_COUNT];

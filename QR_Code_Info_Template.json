@@ -2,20 +2,18 @@
     {
         "Code Type": "QR Code",
         "Code Info": {
+            "Model" : 2,
             "Avaiable": true,
             "Mirror": false,
             "Inverse": false,
             "Version": 21,
             "Error Correction Level": 1,
             "Mask": 4,
-            "Mode": 3,
-            "PM Ref Gray" : 13,
+            "PM Ref Gray": 13,
             "Decode Info": {
-                "Text": "https://www.google.com/",
                 "Text Length": 23,
                 "Codewords Total Size": 1890,
-                "Error Codewords": 123,
-                "Corrected Codewords": 123
+                "Error Codewords": 123
             },
             "Position Markings": [
                 {
@@ -136,7 +134,7 @@
             "Version": 0,
             "Error Correction Level": 255,
             "Mask": 255,
-            "Mode": 255,
+            "PM Ref Gray": 255,
             "Decode Info": {
                 "Text Length": 0,
                 "Codewords Total Size": 0,
