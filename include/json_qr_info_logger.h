@@ -57,7 +57,7 @@ typedef struct {
     unsigned char pm_grayT;       /* 位置探测图形参考灰度值 */
 
     /**QR码的版本**/
-    unsigned char model;          /* QR码版本, 0: 未知版本, 1: QR Model1, 2: QR Model2, 3: MarcoQR */
+    unsigned char model;          /* QR码版本, 0xFF: 未知版本, 1: QR Model1, 2: QR Model2, 0: MarcoQR */
 } json_qr_code_info;
 
 extern void json_qr_info_clear(json_qr_code_info *info,
@@ -70,11 +70,14 @@ extern int json_qr_code_info_parser(const char *filename,
         json_qr_code_info *info, const unsigned int count);
 
 #ifdef __cplusplus
+}
 
-extern int json_parse_qr_object(rapidjson::Value &v, json_qr_code_info *info);
+/**解析json对象中的QR码信息, 如果是QR码, 返回0, 否则返回-1**/
+extern int json_parse_qr_object(const rapidjson::Value &v, json_qr_code_info *info);
 
+/**将QR码信息设置为一串json个数的字符串,是一个数组**/
 extern std::string json_qr_code_info_to_json_string(const json_qr_code_info *info,
         const unsigned int info_count);
-}
+
 #endif
 

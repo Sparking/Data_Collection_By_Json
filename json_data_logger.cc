@@ -1,4 +1,4 @@
-#include <time.h>
+﻿#include <time.h>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -19,20 +19,27 @@ extern "C" void json_data_logger_clear(json_data_logger_t *logger)
             json_qr_info_clear(logger->info_qr, logger->qr_count);
             delete[] logger->info_qr;
         }
-        // 释放其他码配置
-        memset(logger, 0, sizeof(*logger));
+        /* 释放其他码配置 */
+        std::memset(logger, 0, sizeof(*logger));
     }
 }
 
-/* a是标准 */
 std::string json_data_logger_compare(const json_data_logger_t *std_log,
         const json_data_logger_t *b)
 {
     std::string diff;
     char diff_log[2048];
 
-    if (std_log == nullptr || b == nullptr) {
-        diff = "all\n";
+    if (std_log == nullptr && b == nullptr) {
+        diff = "note: not found any info\n";
+        return diff;
+    }
+
+    if (std_log == nullptr) {
+        diff = "note: not found reference info\n";
+        return diff;
+    } else if (b == nullptr) {
+        diff = "note: decode info is empty\n";
         return diff;
     }
 
@@ -43,20 +50,23 @@ std::string json_data_logger_compare(const json_data_logger_t *std_log,
         } else {
             diff += "Type: Find extra QR\n";
         }
-    } else if (0) { // 其他码扩展
+    } else if (0) { /* 其他码扩展 */
         diff += "Type: Other Code\n";
     }
 #endif
 
-    if (std_log->qr_count != b->qr_count) {
-        if (std_log->qr_count > b->qr_count) {
-            snprintf(diff_log, sizeof(diff_log), "count: less QR count[%d]\n",
-                std_log->qr_count - b->qr_count);
-        } else {
-            snprintf(diff_log, sizeof(diff_log), "count: more QR count[%d]\n",
-                b->qr_count - std_log->qr_count);
+    if (std_log->qr_count != 0 && b->qr_count != 0) {
+        if (std_log->qr_count != b->qr_count) {
+            diff += "[QR]:\n";
+            if (std_log->qr_count > b->qr_count) {
+                snprintf(diff_log, sizeof(diff_log), "count: less %d counts\n",
+                    std_log->qr_count - b->qr_count);
+            } else {
+                snprintf(diff_log, sizeof(diff_log), "count: more %d counts\n",
+                    b->qr_count - std_log->qr_count);
+            }
+            diff += diff_log;
         }
-        diff += diff_log;
     }
 
     return diff;
@@ -73,7 +83,7 @@ extern "C" int json_data_logger_parse_file(const char *filename, json_data_logge
     if (filename == nullptr || info == nullptr)
         return -1;
 
-    memset(info, 0, sizeof(*info));
+    std::memset(info, 0, sizeof(*info));
     json_file.open(filename, std::fstream::in);
     if (!json_file.is_open())
         return -1;
@@ -90,9 +100,18 @@ extern "C" int json_data_logger_parse_file(const char *filename, json_data_logge
             while (it != m.End()) {
                 if (json_parse_qr_object(*it, &qr_info) == 0) {
                     vec_qr.push_back(qr_info);
-                } else { // 其他码判断扩展
+                } else { /* 其他码判断扩展 */
                 }
                 ++it;
+            }
+        } while (0);
+        break;
+    case rapidjson::kObjectType:
+        do {
+            rapidjson::Value m = doc.GetObject();
+            if (json_parse_qr_object(m, &qr_info) == 0) {
+                vec_qr.push_back(qr_info);
+            } else if (0) { /* 其他码判断扩展 */
             }
         } while (0);
         break;
@@ -114,7 +133,8 @@ extern "C" int json_data_logger_parse_file(const char *filename, json_data_logge
         info->qr_count = cnt;
         info->type.qr = true;
         for (i = 0; i < cnt; ++i)
-            memcpy(info->info_qr + i, &vec_qr[i], sizeof(info->info_qr[0]));
+            std::memcpy(info->info_qr + i, &vec_qr[i],
+                sizeof(info->info_qr[0]));
     }
 
     /* 其他码 */
@@ -142,7 +162,8 @@ static int json_data_logger_save_vector(const char *new_filename,
     for (i = 0; i < vec_log.size(); ++i) {
         doc.Parse(vec_log[i].c_str());
         if (doc.GetType() == rapidjson::kArrayType) {
-            rapidjson::Document::ValueIterator it = doc.GetArray().Begin();
+            rapidjson::Document::ValueIterator it
+                = doc.GetArray().Begin();
             while (it != doc.GetArray().End()) {
                 jarray.PushBack(*it, allocator);
                 ++it;
@@ -159,8 +180,8 @@ static int json_data_logger_save_vector(const char *new_filename,
 }
 
 /* 返回差异: -1:表示出错 0: 无差异 1: 存在差异 */
-extern "C" int json_data_logger_writer(const char *base_file, const char *ba,
-        const json_data_logger_t *log)
+extern "C" int json_data_logger_writer(const char *base_file,
+        const char *ba, const json_data_logger_t *log)
 {
     json_data_logger_t std_log; /* 标准记录文件的解析内容 */
     time_t tmt;
@@ -193,13 +214,16 @@ extern "C" int json_data_logger_writer(const char *base_file, const char *ba,
     diff_fs.open(sfilename.c_str(), std::ios_base::out);
     if (!diff_fs.is_open()) {
         json_data_logger_clear(&std_log);
-        std::cerr << "can't log the difference of file \"" << base_file << "\"" << std::endl;
+        std::cerr << "can't log the difference of file \""
+            << base_file << "\"" << std::endl;
         return -1;
     }
     std::string s = json_data_logger_compare(&std_log, log);
+    diff_fs << "result file: " << new_filename << std::endl;
     if (s.size() != 0) {
-        diff_fs << "result file: " << new_filename << std::endl;
         diff_fs << s << std::endl;
+    } else {
+        diff_fs << "pass: compare results are all the same!" << std::endl;
     }
     diff_fs.close();
     json_data_logger_clear(&std_log);
