@@ -4,7 +4,7 @@ CXX      := g++
 RANLIB   := ranlib
 ARFLAGS  := rc
 CFLAGS   := -g -O0 -ffunction-sections -fdata-sections -fno-strict-aliasing
-CPPFLAGS := -Wall -Werror -ansi -MMD -I$(CURDIR)/include
+CPPFLAGS := -Wall -Werror -ansi -MMD -I$(CURDIR)/include -DENABLE_JSON_LOG=1U
 LDFLAGS  := -Wl,--as-needed -Wl,-gc-section -L$(CURDIR)
 LIBS     :=
 

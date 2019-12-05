@@ -8,22 +8,104 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
 
+static void json_qr_code_info_reset(json_qr_code_info *info)
+{
+    info->pm_size = 0;
+    memset(info->ppm, 0, sizeof(info->ppm));
+    info->am_size = 0;
+    memset(info->pam, 0, sizeof(info->pam));
+    info->text_length = 0;
+    info->codewords_num = 0;
+    info->error_codewords = 0;
+    info->version = 0;
+    info->ec_level = 0xFF;
+    info->mask = 0xFF;
+    info->available = false;
+    info->inverse = false;
+    info->mirror = false;
+    info->pm_grayT = 0;
+    info->model = 0xFF;
+}
+
 extern "C" void json_qr_info_clear(json_qr_code_info *info,
+        const unsigned int info_count)
+{
+    if (info != nullptr && info_count != 0) {
+        std::memset(info, 0, sizeof(*info) * info_count);
+    }
+}
+
+extern "C" void json_qr_info_init(json_qr_code_info *info,
         const unsigned int info_count)
 {
     unsigned int i;
 
-    i = info_count;
-    while (i-- > 0) {
-        if (info[i].pam) {
-            delete[] info[i].pam;
-        }
-
-        if (info[i].ppm) {
-            delete[] info[i].ppm;
+    if (info != nullptr && info_count != 0) {
+        for (i = 0; i < info_count; ++i) {
+            json_qr_code_info_reset(info + i);
         }
     }
-    memset(info, 0, sizeof(*info) * info_count);
+}
+
+extern "C" unsigned int json_qr_code_info_handler(json_qr_code_info *info,
+        const unsigned int count)
+{
+    int i;
+    unsigned int real_cnt;
+    json_qr_code_info *pinfo[2];
+    json_qr_code_info *info_end, *it;
+    json_qr_code_info *buff_info;
+
+    if (info == NULL)
+        return 0;
+
+    if (count <= 1)
+        return count;
+
+    buff_info = new json_qr_code_info[count];
+    if (buff_info == nullptr)
+        return count;
+
+    real_cnt = 0;
+    pinfo[0] = info;
+    pinfo[1] = info + 1;
+    info_end = info + count;
+    while (pinfo[1] < info_end) {
+        if (pinfo[0]->available || pinfo[0]->pm_size != 1) {
+            memcpy(&buff_info[real_cnt++], pinfo[0], sizeof(*pinfo[0]));
+
+            ++pinfo[0];
+            if (pinfo[1] == pinfo[0])
+                ++pinfo[1];
+
+            continue;
+        }
+
+        for (it = pinfo[1]; it < info_end; ++it) {
+            for (i = 0; i < it->pm_size; ++i) {
+                if (!memcmp(it->ppm + i, pinfo[0]->ppm,
+                        sizeof(pinfo[0]->ppm[0]))) {
+                    break;
+                }
+            }
+
+            if (i != it->pm_size)
+                break;
+        }
+
+        if (it != info_end)
+            memcpy(&buff_info[real_cnt++], pinfo[0], sizeof(*pinfo[0]));
+
+        ++pinfo[0];
+        if (pinfo[1] == pinfo[0])
+            ++pinfo[1];
+    }
+    memcpy(info, buff_info, sizeof(*info) * real_cnt);
+    if (real_cnt != count)
+        memset(info + real_cnt, 0, sizeof(*info) * (count - real_cnt));
+    delete[] buff_info;
+
+    return real_cnt;
 }
 
 std::string json_qr_code_info_to_json_string(const json_qr_code_info *info,
@@ -380,9 +462,6 @@ int json_parse_qr_object(const rapidjson::Value &v, json_qr_code_info *info)
     }
 
     info->pm_size = vqpm.size();
-    info->ppm = new json_qr_position_markings[info->pm_size];
-    if (info->ppm == nullptr)
-        return -1;
     for (i = 0; i < vqpm.size(); ++i)
         std::memcpy(info->ppm + i, &vqpm[i], sizeof(info->ppm[0]));
 
@@ -391,8 +470,6 @@ int json_parse_qr_object(const rapidjson::Value &v, json_qr_code_info *info)
     if (itr1 != itr->value.MemberEnd()) {
         if (itr1->value.GetType() != rapidjson::kArrayType) {
             std::cerr << "Code Info should be an object" << std::endl;
-            delete[] info->ppm;
-            info->ppm = nullptr;
             return -1;
         }
 
@@ -442,12 +519,9 @@ int json_parse_qr_object(const rapidjson::Value &v, json_qr_code_info *info)
         }
 
         if (vqam.size() != 0) {
-            info->pam = new json_qr_alignment_markings[vqam.size()];
-            if (info->pam != nullptr) {
-                info->am_size = vqam.size();
-                for (i = 0; i < vqam.size(); ++i)
-                    std::memcpy(info->pam + i, &vqam[i], sizeof(info->pam[0]));
-            }
+            info->am_size = vqam.size();
+            for (i = 0; i < vqam.size(); ++i)
+                std::memcpy(info->pam + i, &vqam[i], sizeof(info->pam[0]));
         }
     } /* End of If */
 

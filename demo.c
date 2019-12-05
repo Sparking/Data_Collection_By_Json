@@ -7,10 +7,12 @@ int main(int argc, char *argv[])
     unsigned int g_json_qr_info_count = 0;
     json_data_logger_t a;
 
+    g_json_logger_init(100);
     if (argc < 2)
         return -1;
 
     g_json_qr_info_count = json_qr_code_info_parser(argv[1], g_json_qr_info, JSON_MAX_QR_COUNT);
+    g_json_qr_info_count = json_qr_code_info_handler(g_json_qr_info, g_json_qr_info_count);
     json_qr_code_info_writer("test.json", g_json_qr_info, g_json_qr_info_count);
     json_qr_info_clear(g_json_qr_info, g_json_qr_info_count);
 

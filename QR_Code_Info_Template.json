@@ -250,5 +250,74 @@
                 }
             ]
         }
+    },{
+        "Code Type": "QR Code",
+        "Code Info": {
+            "Model" : 2,
+            "Avaiable": false,
+            "Mirror": false,
+            "Inverse": false,
+            "Version": 21,
+            "Error Correction Level": 1,
+            "Mask": 4,
+            "PM Ref Gray": 13,
+            "Decode Info": {
+                "Text Length": 23,
+                "Codewords Total Size": 1890,
+                "Error Codewords": 123
+            },
+            "Position Markings": [
+                {
+                    "Order": 0,
+                    "Center XY": [
+                        324,
+                        546
+                    ],
+                    "Conners": [
+                        [
+                            741,
+                            523
+                        ],
+                        [
+                            908,
+                            137
+                        ],
+                        [
+                            416,
+                            734
+                        ],
+                        [
+                            515,
+                            234
+                        ]
+                    ],
+                    "X Width": 0,
+                    "Y Width": 0,
+                    "Module Size": 5.070000171661377
+                }
+            ],
+            "Alignment Markings": [
+                {
+                    "Origin XY": [
+                        6,
+                        18
+                    ],
+                    "Center XY": [
+                        70,
+                        31
+                    ]
+                },
+                {
+                    "Origin XY": [
+                        6,
+                        8
+                    ],
+                    "Center XY": [
+                        120,
+                        45
+                    ]
+                }
+            ]
+        }
     }
 ]

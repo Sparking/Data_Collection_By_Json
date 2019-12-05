@@ -13,19 +13,19 @@ typedef struct  {
 } json_point_t;
 
 typedef struct {
-	bool _1dcode;
-	bool aztec;
-	bool dm;
-	bool dotcode;
-	bool gm;
-	bool hanxin;
-	bool maxi;
-	bool micropdf417;
-	bool ocr_pvi;
-	bool passport;
-	bool pdf417;
-	bool postal;
-	bool qr;
+    bool _1dcode;
+    bool aztec;
+    bool dm;
+    bool dotcode;
+    bool gm;
+    bool hanxin;
+    bool maxi;
+    bool micropdf417;
+    bool ocr_pvi;
+    bool passport;
+    bool pdf417;
+    bool postal;
+    bool qr;
 } json_codetype_flag_t;
 
 #ifdef __cplusplus

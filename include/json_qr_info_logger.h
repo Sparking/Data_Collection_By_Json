@@ -32,11 +32,11 @@ typedef struct {
 typedef struct {
     /**位置探测图形信息**/
     int pm_size;                  /* 位置探测图形个数 */
-    json_qr_position_markings *ppm;   /* 位置探测图形信息 */
+    json_qr_position_markings ppm[3];   /* 位置探测图形信息 */
 
     /**校正图形信息**/
     int am_size;                  /* 校正图形个数 */
-    json_qr_alignment_markings *pam;  /* 校正图形信息 */
+    json_qr_alignment_markings pam[49];  /* 校正图形信息 */
 
     /**解码信息**/
     /* char *text; */             /* 解码后的数据, 无需记录, 因为有二进制的内容 */
@@ -53,15 +53,20 @@ typedef struct {
     bool available;               /* QR是否可用，即是否能被解码 */
     bool inverse;                 /* QR码是否反向 */
     bool mirror;                  /* QR码是否是反相的 */
-    unsigned char pos_style;      /* QR摆放顺序 */
     unsigned char pm_grayT;       /* 位置探测图形参考灰度值 */
 
     /**QR码的版本**/
     unsigned char model;          /* QR码版本, 0xFF: 未知版本, 1: QR Model1, 2: QR Model2, 0: MarcoQR */
 } json_qr_code_info;
 
+extern void json_qr_info_init(json_qr_code_info *info,
+        const unsigned int info_count);
+
 extern void json_qr_info_clear(json_qr_code_info *info,
         const unsigned int info_count);
+
+extern unsigned int json_qr_code_info_handler(json_qr_code_info *info,
+        const unsigned int count);
 
 extern int json_qr_code_info_writer(const char *filename,
         const json_qr_code_info *info, const unsigned int count);

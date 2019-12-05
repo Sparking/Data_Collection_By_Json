@@ -1,4 +1,5 @@
-﻿#include <time.h>
+﻿#include <assert.h>
+#include <time.h>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -10,13 +11,33 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
 
-json_codetype_flag_t g_json_codetype_flag = {0};
+#ifdef ENABLE_JSON_LOG
+extern "C" {
+json_data_logger_t g_json_logger = {0};
+unsigned int g_json_logger_code_max_cnt = 0;
+}
+
+extern "C" void g_json_logger_init(const unsigned int max_cnt)
+{
+    g_json_logger_code_max_cnt = max_cnt;
+    json_data_logger_clear(&g_json_logger);
+
+    g_json_logger.info_qr = new json_qr_code_info[max_cnt];
+    assert(g_json_logger.info_qr != nullptr);
+    json_qr_info_init(g_json_logger.info_qr, max_cnt);
+}
+
+extern "C" void g_json_logger_clear(void)
+{
+    json_data_logger_clear(&g_json_logger);
+}
+#endif
 
 extern "C" void json_data_logger_clear(json_data_logger_t *logger)
 {
     if (logger != nullptr) {
         if (logger->info_qr != nullptr) {
-            json_qr_info_clear(logger->info_qr, logger->qr_count);
+            json_qr_info_clear(logger->info_qr, logger->nqr);
             delete[] logger->info_qr;
         }
         /* 释放其他码配置 */
@@ -55,15 +76,15 @@ std::string json_data_logger_compare(const json_data_logger_t *std_log,
     }
 #endif
 
-    if (std_log->qr_count != 0 && b->qr_count != 0) {
-        if (std_log->qr_count != b->qr_count) {
+    if (std_log->nqr != 0 && b->nqr != 0) {
+        if (std_log->nqr != b->nqr) {
             diff += "[QR]:\n";
-            if (std_log->qr_count > b->qr_count) {
+            if (std_log->nqr > b->nqr) {
                 snprintf(diff_log, sizeof(diff_log), "count: less %d counts\n",
-                    std_log->qr_count - b->qr_count);
+                    std_log->nqr - b->nqr);
             } else {
                 snprintf(diff_log, sizeof(diff_log), "count: more %d counts\n",
-                    b->qr_count - std_log->qr_count);
+                    b->nqr - std_log->nqr);
             }
             diff += diff_log;
         }
@@ -130,7 +151,7 @@ extern "C" int json_data_logger_parse_file(const char *filename, json_data_logge
             return -1;
         }
 
-        info->qr_count = cnt;
+        info->nqr = cnt;
         info->type.qr = true;
         for (i = 0; i < cnt; ++i)
             std::memcpy(info->info_qr + i, &vec_qr[i],
@@ -228,7 +249,7 @@ extern "C" int json_data_logger_writer(const char *base_file,
     diff_fs.close();
     json_data_logger_clear(&std_log);
 
-    slog = json_qr_code_info_to_json_string(log->info_qr, log->qr_count);
+    slog = json_qr_code_info_to_json_string(log->info_qr, log->nqr);
     if (slog.size() != 0)
         vec_log.push_back(slog);
 
