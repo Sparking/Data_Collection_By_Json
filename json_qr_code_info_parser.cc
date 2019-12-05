@@ -8,23 +8,28 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
 
+static void json_qr_base_info_reset(json_qr_code_info *info)
+{
+    info->version = 0xFF;
+    info->ec_level = 0xFF;
+    info->mask = 0xFF;
+    info->available = false;
+    info->mirror = false;
+    info->model = 0xFF;
+    info->text_length = 0;
+    info->codewords_num = 0;
+    info->error_codewords = 0;
+}
+
 static void json_qr_code_info_reset(json_qr_code_info *info)
 {
     info->pm_size = 0;
     memset(info->ppm, 0, sizeof(info->ppm));
     info->am_size = 0;
     memset(info->pam, 0, sizeof(info->pam));
-    info->text_length = 0;
-    info->codewords_num = 0;
-    info->error_codewords = 0;
-    info->version = 0;
-    info->ec_level = 0xFF;
-    info->mask = 0xFF;
-    info->available = false;
-    info->inverse = false;
-    info->mirror = false;
     info->pm_grayT = 0;
-    info->model = 0xFF;
+    info->inverse = false;
+    json_qr_base_info_reset(info);
 }
 
 extern "C" void json_qr_info_clear(json_qr_code_info *info,
@@ -45,67 +50,6 @@ extern "C" void json_qr_info_init(json_qr_code_info *info,
             json_qr_code_info_reset(info + i);
         }
     }
-}
-
-extern "C" unsigned int json_qr_code_info_handler(json_qr_code_info *info,
-        const unsigned int count)
-{
-    int i;
-    unsigned int real_cnt;
-    json_qr_code_info *pinfo[2];
-    json_qr_code_info *info_end, *it;
-    json_qr_code_info *buff_info;
-
-    if (info == NULL)
-        return 0;
-
-    if (count <= 1)
-        return count;
-
-    buff_info = new json_qr_code_info[count];
-    if (buff_info == nullptr)
-        return count;
-
-    real_cnt = 0;
-    pinfo[0] = info;
-    pinfo[1] = info + 1;
-    info_end = info + count;
-    while (pinfo[1] < info_end) {
-        if (pinfo[0]->available || pinfo[0]->pm_size != 1) {
-            memcpy(&buff_info[real_cnt++], pinfo[0], sizeof(*pinfo[0]));
-
-            ++pinfo[0];
-            if (pinfo[1] == pinfo[0])
-                ++pinfo[1];
-
-            continue;
-        }
-
-        for (it = pinfo[1]; it < info_end; ++it) {
-            for (i = 0; i < it->pm_size; ++i) {
-                if (!memcmp(it->ppm + i, pinfo[0]->ppm,
-                        sizeof(pinfo[0]->ppm[0]))) {
-                    break;
-                }
-            }
-
-            if (i != it->pm_size)
-                break;
-        }
-
-        if (it != info_end)
-            memcpy(&buff_info[real_cnt++], pinfo[0], sizeof(*pinfo[0]));
-
-        ++pinfo[0];
-        if (pinfo[1] == pinfo[0])
-            ++pinfo[1];
-    }
-    memcpy(info, buff_info, sizeof(*info) * real_cnt);
-    if (real_cnt != count)
-        memset(info + real_cnt, 0, sizeof(*info) * (count - real_cnt));
-    delete[] buff_info;
-
-    return real_cnt;
 }
 
 std::string json_qr_code_info_to_json_string(const json_qr_code_info *info,
@@ -278,24 +222,6 @@ int json_parse_qr_object(const rapidjson::Value &v, json_qr_code_info *info)
         info->model = itr1->value.GetUint();
     }
 
-    itr1 = itr->value.FindMember("Avaiable");
-    if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
-            && itr1->value.GetType() != rapidjson::kTrueType)) {
-        /* 没有设置, 则默认不可解码 */
-        info->available = false;
-    } else {
-        info->available = itr1->value.GetBool();
-    }
-
-    itr1 = itr->value.FindMember("Mirror");
-    if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
-            && itr1->value.GetType() != rapidjson::kTrueType)) {
-        /* 没有设置, 则默认为非镜像 */
-        info->mirror = false;
-    } else {
-        info->mirror = itr1->value.GetBool();
-    }
-
     itr1 = itr->value.FindMember("Inverse");
     if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
             && itr1->value.GetType() != rapidjson::kTrueType)) {
@@ -305,46 +231,69 @@ int json_parse_qr_object(const rapidjson::Value &v, json_qr_code_info *info)
         info->inverse = itr1->value.GetBool();
     }
 
-    itr1 = itr->value.FindMember("Version");
-    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
-        info->version = 0; /* 0表示QR的版本没有设置, 或设置错误 */
+    itr1 = itr->value.FindMember("Avaiable");
+    if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
+            && itr1->value.GetType() != rapidjson::kTrueType)) {
+        /* 没有设置, 则默认不可解码 */
+        info->available = false;
     } else {
-        info->version = itr1->value.GetUint();
-        if (info->version > 40)
-            info->version = 0;  /* 版本不正常, 认为设置错误 */
+        info->available = itr1->value.GetBool();
     }
 
-    itr1 = itr->value.FindMember("Error Correction Level");
-    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
-        info->ec_level = 0xFF; /* 0xFF表示QR的纠错级别没有设置, 或设置错误 */
-    } else {
-        if (itr1->value.GetUint() > 3) {
-            info->ec_level = 0xFF;  /* 纠错级别不正常, 认为设置错误 */
+    if (info->available == true) {
+        itr1 = itr->value.FindMember("Mirror");
+        if (itr1 == itr->value.MemberEnd() || (itr1->value.GetType() != rapidjson::kFalseType
+                && itr1->value.GetType() != rapidjson::kTrueType)) {
+            /* 没有设置, 则默认为非镜像 */
+            info->mirror = false;
         } else {
-            info->ec_level = itr1->value.GetUint();
+            info->mirror = itr1->value.GetBool();
         }
-    }
 
-    itr1 = itr->value.FindMember("Mask");
-    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
-        info->mask = 0xFF; /* 0xFF表示QR的掩膜版本没有设置, 或设置错误 */
-    } else {
-        if (itr1->value.GetUint() > 8) {
-            info->mask = 0xFF;  /* 掩膜版本不正常, 认为设置错误 */
+        itr1 = itr->value.FindMember("Version");
+        if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+            info->version = 0xFF;
         } else {
-            info->mask = itr1->value.GetUint();
+            info->version = itr1->value.GetUint();
+            if (info->model != 2 && info->version > 40) /* Model 2的判断 */
+                info->version = 0xFF;
         }
+
+        itr1 = itr->value.FindMember("Error Correction Level");
+        if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+            info->ec_level = 0xFF; /* 0xFF表示QR的纠错级别没有设置, 或设置错误 */
+        } else {
+            if (itr1->value.GetUint() > 3) {
+                info->ec_level = 0xFF;  /* 纠错级别不正常, 认为设置错误 */
+            } else {
+                info->ec_level = itr1->value.GetUint();
+            }
+        }
+
+        itr1 = itr->value.FindMember("Mask");
+        if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
+            info->mask = 0xFF; /* 0xFF表示QR的掩膜版本没有设置, 或设置错误 */
+        } else {
+            if (itr1->value.GetUint() > 8) {
+                info->mask = 0xFF;  /* 掩膜版本不正常, 认为设置错误 */
+            } else {
+                info->mask = itr1->value.GetUint();
+            }
+        }
+    } else {
+        json_qr_base_info_reset(info);
     }
 
     itr1 = itr->value.FindMember("PM Ref Gray");
     if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kNumberType) {
-        info->pm_grayT = 0xFF;
+        info->pm_grayT = 0;
     } else {
         info->pm_grayT = itr1->value.GetUint();
     }
 
     itr1 = itr->value.FindMember("Decode Info");
-    if (itr1 == itr->value.MemberEnd() || itr1->value.GetType() != rapidjson::kObjectType) {
+    if (info->available == false || itr1 == itr->value.MemberEnd()
+            || itr1->value.GetType() != rapidjson::kObjectType) {
         info->text_length = 0;
         info->codewords_num = 0;
         info->error_codewords = 0;

@@ -1,14 +1,9 @@
 ﻿#pragma once
 
 #include "json_data_logger_types.h"
-
 #ifdef __cplusplus
-#include <string.h>
-
 extern "C" {
 #endif
-
-#include <stdbool.h>
 
 #define JSON_MAX_QR_COUNT   15   /* 一个JSPON文件最多能记录的QR码的数量 */
 
@@ -64,9 +59,6 @@ extern void json_qr_info_init(json_qr_code_info *info,
 
 extern void json_qr_info_clear(json_qr_code_info *info,
         const unsigned int info_count);
-
-extern unsigned int json_qr_code_info_handler(json_qr_code_info *info,
-        const unsigned int count);
 
 extern int json_qr_code_info_writer(const char *filename,
         const json_qr_code_info *info, const unsigned int count);

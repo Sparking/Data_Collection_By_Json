@@ -1,10 +1,10 @@
 ﻿#pragma once
 
-#include <stdbool.h>
-
 #ifdef __cplusplus
 #include <rapidjson/document.h>
 extern "C" {
+#else
+#include <stdbool.h>
 #endif
 
 typedef struct  {

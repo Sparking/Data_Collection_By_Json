@@ -12,7 +12,6 @@ int main(int argc, char *argv[])
         return -1;
 
     g_json_qr_info_count = json_qr_code_info_parser(argv[1], g_json_qr_info, JSON_MAX_QR_COUNT);
-    g_json_qr_info_count = json_qr_code_info_handler(g_json_qr_info, g_json_qr_info_count);
     json_qr_code_info_writer("test.json", g_json_qr_info, g_json_qr_info_count);
     json_qr_info_clear(g_json_qr_info, g_json_qr_info_count);
 
